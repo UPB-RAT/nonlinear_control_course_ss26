@@ -1,4 +1,5 @@
 # NLC Drone Simulation & Controller
+![Bebop Drone Simulation](docs/robotic_systems.png)
 
 ROS2 Humble + Gazebo Ignition simulation of Parrot Bebop 2 drones with PID position control.
 
