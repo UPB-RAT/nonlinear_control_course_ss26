@@ -1,24 +1,26 @@
 import math
+import numpy as np
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Pose, Twist, Point
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, String
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 
 from controller.pid import PID
 from controller.waypoint_manager import WaypointManager
+from controller.minimum_snap import MinimumSnapTrajectory
 
 
-class DroneController(Node):
+class DroneControllerTraj(Node):
 
     def __init__(self):
-        super().__init__('drone_controller')
+        super().__init__('drone_controller_traj')
         self._declare_parameters()
 
-        robot_name   = self.get_parameter('robot_name').value
-        self._rate   = self.get_parameter('control_rate').value
-        self._armed  = False
-        self._goal   = None   # [x, y, z, yaw] — set via topic or default waypoint
+        robot_name        = self.get_parameter('robot_name').value
+        self._rate        = self.get_parameter('control_rate').value
+        self._takeoff_z   = self.get_parameter('takeoff_height').value
+        self._armed       = False
 
         # ── PID controllers ───────────────────────────────────────────────────
         self._pid = {
@@ -28,27 +30,29 @@ class DroneController(Node):
             'yaw': self._make_pid('pid_yaw', 'max_yaw_rate'),
         }
 
-        # ── Waypoint manager ──────────────────────────────────────────────────
+        # ── Trajectory ────────────────────────────────────────────────────────
         wps       = self.get_parameter('waypoints').value
         waypoints = [list(wps[i:i+4]) for i in range(0, len(wps), 4)]
-        self._wpm = WaypointManager(
-            waypoints,
-            xy_tol  = self.get_parameter('xy_tolerance').value,
-            z_tol   = self.get_parameter('z_tolerance').value,
-            yaw_tol = self.get_parameter('yaw_tolerance').value,
-        )
 
-        # Set initial goal from first waypoint
-        self._goal = list(waypoints[0]) if waypoints else None
+        # Confirm waypoints loaded correctly from launch file
+        self.get_logger().info(
+            f'Loaded {len(waypoints)} waypoints from parameter:')
+        for i, wp in enumerate(waypoints):
+            self.get_logger().info(f'  wp{i}: {wp}')
 
-        # ── Takeoff state ─────────────────────────────────────────────────────
-        self._takeoff_z      = self.get_parameter('takeoff_height').value
-        self._phase          = 'TAKEOFF'   # 'TAKEOFF' → 'FLY'
-        self._takeoff_origin = None        # locked on first control tick
+        times        = self._allocate_times(waypoints)
+        self._traj   = MinimumSnapTrajectory(waypoints, times)
+        self._traj_t = None
+
+        self.get_logger().info(
+            f'Minimum snap trajectory loaded — '
+            f'{len(waypoints)} waypoints, '
+            f'total time: {self._traj.total_time:.1f}s')
 
         # ── State ─────────────────────────────────────────────────────────────
         self._pose   = None
         self._last_t = None
+        self._phase  = 'TAKEOFF'   # 'TAKEOFF' → 'TRAJ'
 
         # ── Publishers / Subscribers ──────────────────────────────────────────
         self._cmd_pub = self.create_publisher(
@@ -60,10 +64,18 @@ class DroneController(Node):
             Pose, f'/{robot_name}/pose',
             self._pose_cb, 10)
 
+        # Multi-waypoint trajectory via CSV string
+        # "x1,y1,z1,yaw1, x2,y2,z2,yaw2, ..."
+        self.create_subscription(
+            String, f'/{robot_name}/waypoints',
+            self._waypoints_cb, 10)
+
+        # Single goal — full pose
         self.create_subscription(
             Pose, f'/{robot_name}/goal_pose',
             self._goal_pose_cb, 10)
 
+        # Single goal — point only (yaw=0)
         self.create_subscription(
             Point, f'/{robot_name}/goal',
             self._goal_point_cb, 10)
@@ -73,15 +85,15 @@ class DroneController(Node):
         self.create_timer(2.0, self._arm_once)
 
         self.get_logger().info(
-            f'DroneController ready — arming in 2s\n'
-            f'  Takeoff height : {self._takeoff_z:.1f}m\n'
-            f'  Initial goal   : {self._goal}\n'
-            f'  Send new goals via:\n'
-            f'    ros2 topic pub --once /{robot_name}/goal_pose '
-            f'geometry_msgs/msg/Pose '
-            f'"{{position: {{x: 1.0, y: 0.0, z: 1.5}}, orientation: {{w: 1.0}}}}"\n'
+            f'DroneControllerTraj ready — arming in 2s\n'
+            f'  Takeoff height: {self._takeoff_z:.1f}m\n'
+            f'  Send waypoints:\n'
+            f'    ros2 topic pub --once /{robot_name}/waypoints '
+            f'std_msgs/msg/String '
+            f'"{{data: \'0,0,2,0, 2,0,2,0, 2,2,2,0\'}}"\n'
+            f'  Send single goal:\n'
             f'    ros2 topic pub --once /{robot_name}/goal '
-            f'geometry_msgs/msg/Point "{{x: 1.0, y: 0.0, z: 1.5}}"'
+            f'geometry_msgs/msg/Point "{{x: 2.0, y: 0.0, z: 2.0}}"'
         )
 
     # ── Arming ────────────────────────────────────────────────────────────────
@@ -90,38 +102,66 @@ class DroneController(Node):
             msg = Bool()
             msg.data = True
             self._arm_pub.publish(msg)
-            self._armed          = True
-            self._takeoff_origin = None   # locked lazily on first control tick
-            self.get_logger().info(
-                'Drone armed ✅ — takeoff origin will lock on first pose')
+            self._armed = True
+            self.get_logger().info('Drone armed ✅')
 
     # ── Pose callback ─────────────────────────────────────────────────────────
     def _pose_cb(self, msg: Pose):
         self._pose = msg
 
-    # ── Goal callbacks ────────────────────────────────────────────────────────
+    # ── Waypoint / goal callbacks ─────────────────────────────────────────────
+    def _waypoints_cb(self, msg: String):
+        """
+        Receive new waypoint list as flat CSV string at runtime.
+        Example:
+          ros2 topic pub --once /bebop1/waypoints std_msgs/msg/String \
+            "{data: '0,0,2,0, 2,0,2,0, 2,2,2,0, 0,0,2,0'}"
+        """
+        try:
+            vals      = [float(v.strip()) for v in msg.data.split(',')]
+            waypoints = [list(vals[i:i+4]) for i in range(0, len(vals), 4)]
+            if len(waypoints) < 2:
+                self.get_logger().warn('Need at least 2 waypoints')
+                return
+            self._reset_trajectory(waypoints)
+        except Exception as e:
+            self.get_logger().error(f'Invalid waypoints string: {e}')
+
     def _goal_pose_cb(self, msg: Pose):
-        """Receive full goal pose (position + orientation)."""
-        yaw        = self._quat_to_yaw(msg.orientation)
-        self._goal = [msg.position.x, msg.position.y, msg.position.z, yaw]
-        self._phase = 'FLY'   # skip takeoff if goal arrives mid-flight
-        [pid.reset() for pid in self._pid.values()]
+        """Build 2-point trajectory from current position to goal pose."""
+        if self._pose is None:
+            return
+        yaw     = self._quat_to_yaw(msg.orientation)
+        current = [
+            self._pose.position.x,
+            self._pose.position.y,
+            self._pose.position.z,
+            self._quat_to_yaw(self._pose.orientation)
+        ]
+        goal = [msg.position.x, msg.position.y, msg.position.z, yaw]
+        self._reset_trajectory([current, goal])
         self.get_logger().info(
-            f'New goal_pose: ({self._goal[0]:.2f}, {self._goal[1]:.2f}, '
-            f'{self._goal[2]:.2f}, yaw={math.degrees(yaw):.1f}°)')
+            f'New goal_pose: ({goal[0]:.2f}, {goal[1]:.2f}, '
+            f'{goal[2]:.2f}, yaw={math.degrees(yaw):.1f}°)')
 
     def _goal_point_cb(self, msg: Point):
-        """Receive simple x/y/z goal (yaw preserved)."""
-        yaw        = self._goal[3] if self._goal else 0.0
-        self._goal = [msg.x, msg.y, msg.z, yaw]
-        self._phase = 'FLY'   # skip takeoff if goal arrives mid-flight
-        [pid.reset() for pid in self._pid.values()]
+        """Build 2-point trajectory from current position to goal point."""
+        if self._pose is None:
+            return
+        current = [
+            self._pose.position.x,
+            self._pose.position.y,
+            self._pose.position.z,
+            self._quat_to_yaw(self._pose.orientation)
+        ]
+        goal = [msg.x, msg.y, msg.z, 0.0]
+        self._reset_trajectory([current, goal])
         self.get_logger().info(
-            f'New goal: ({msg.x:.2f}, {msg.y:.2f}, {msg.z:.2f})')
+            f'New goal point: ({msg.x:.2f}, {msg.y:.2f}, {msg.z:.2f})')
 
     # ── Control loop ──────────────────────────────────────────────────────────
     def _control_loop(self):
-        if not self._armed or self._pose is None or self._goal is None:
+        if not self._armed or self._pose is None:
             return
 
         now = self.get_clock().now()
@@ -138,33 +178,36 @@ class DroneController(Node):
         z   = self._pose.position.z
         yaw = self._quat_to_yaw(self._pose.orientation)
 
-        # ── Phase 1: takeoff — hold XY, climb to takeoff_height ───────────────
+        # ── Phase 1: takeoff — climb to takeoff_height before trajectory ──────
         if self._phase == 'TAKEOFF':
-            # Lock origin on first real pose tick
-            if self._takeoff_origin is None:
-                self._takeoff_origin = (x, y)
-                self.get_logger().info(
-                    f'Takeoff origin locked at ({x:.3f}, {y:.3f})')
+            ez = self._takeoff_z - z
 
-            ox, oy = self._takeoff_origin
             self._fly_to(x, y, z, yaw,
-                         ox, oy, self._takeoff_z, 0.0,
+                         x, y, self._takeoff_z, 0.0,
                          dt, 'TAKEOFF')
 
-            if abs(self._takeoff_z - z) < 0.10:
-                self._phase = 'FLY'
+            if abs(ez) < 0.15:
+                self._phase  = 'TRAJ'
+                self._traj_t = now.nanoseconds * 1e-9
                 [pid.reset() for pid in self._pid.values()]
                 self.get_logger().info(
-                    f'Takeoff complete at z={z:.2f}m '
-                    f'xy_drift=({x - ox:.3f}, {y - oy:.3f}) — flying to goal ✅')
+                    f'Takeoff complete at z={z:.2f}m — starting trajectory ✅')
             return
 
-        # ── Phase 2: fly to goal ──────────────────────────────────────────────
-        tx, ty, tz, tyaw = self._goal
-        self._fly_to(x, y, z, yaw, tx, ty, tz, tyaw, dt, 'FLY')
+        # ── Phase 2: follow minimum snap trajectory ───────────────────────────
+        elapsed = now.nanoseconds * 1e-9 - self._traj_t
+
+        if elapsed >= self._traj.total_time:
+            tx, ty, tz, tyaw = self._traj.get_goal(self._traj.total_time)
+            label = 'HOVER'
+        else:
+            tx, ty, tz, tyaw = self._traj.get_goal(elapsed)
+            label = f'TRAJ t={elapsed:.1f}/{self._traj.total_time:.1f}s'
+
+        self._fly_to(x, y, z, yaw, tx, ty, tz, tyaw, dt, label)
 
     # ── Fly to target ─────────────────────────────────────────────────────────
-    def _fly_to(self, x, y, z, yaw, tx, ty, tz, tyaw, dt, label='FLY'):
+    def _fly_to(self, x, y, z, yaw, tx, ty, tz, tyaw, dt, label=''):
         ex_world = tx - x
         ey_world = ty - y
         ex   =  ex_world * math.cos(yaw) + ey_world * math.sin(yaw)
@@ -180,9 +223,9 @@ class DroneController(Node):
         dist = math.sqrt(ex_world**2 + ey_world**2 + ez**2)
 
         self.get_logger().info(
-            f'[{label}] target=({tx:.2f},{ty:.2f},{tz:.2f}) '
+            f'[{label}] '
+            f'target=({tx:.2f},{ty:.2f},{tz:.2f}) '
             f'pos=({x:.2f},{y:.2f},{z:.2f}) '
-            f'err=({ex_world:.2f},{ey_world:.2f},{ez:.2f}) '
             f'dist={dist:.2f}m '
             f'cmd=({vx:.2f},{vy:.2f},{vz:.2f})',
             throttle_duration_sec=0.5
@@ -196,6 +239,27 @@ class DroneController(Node):
         self._cmd_pub.publish(cmd)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
+    def _reset_trajectory(self, waypoints: list):
+        times        = self._allocate_times(waypoints)
+        self._traj   = MinimumSnapTrajectory(waypoints, times)
+        self._traj_t = self.get_clock().now().nanoseconds * 1e-9
+        self._phase  = 'TRAJ'   # skip takeoff on runtime updates
+        [pid.reset() for pid in self._pid.values()]
+        self.get_logger().info(
+            f'Trajectory reset: {len(waypoints)} waypoints, '
+            f'{self._traj.total_time:.1f}s')
+
+    @staticmethod
+    def _allocate_times(waypoints: list, avg_speed: float = 0.5) -> list:
+        times = []
+        for i in range(len(waypoints) - 1):
+            dx   = waypoints[i+1][0] - waypoints[i][0]
+            dy   = waypoints[i+1][1] - waypoints[i][1]
+            dz   = waypoints[i+1][2] - waypoints[i][2]
+            dist = max(math.sqrt(dx**2 + dy**2 + dz**2), 0.1)
+            times.append(max(dist / avg_speed, 2.0))
+        return times
+
     def _make_pid(self, prefix: str, limit_param: str) -> PID:
         kp    = self.get_parameter(f'{prefix}.kp').value
         ki    = self.get_parameter(f'{prefix}.ki').value
@@ -214,20 +278,19 @@ class DroneController(Node):
     def _declare_parameters(self):
         self.declare_parameter('robot_name',       'bebop1')
         self.declare_parameter('control_rate',     50.0)
-        self.declare_parameter('xy_tolerance',     0.15)
-        self.declare_parameter('z_tolerance',      0.10)
-        self.declare_parameter('yaw_tolerance',    0.10)
         self.declare_parameter('max_linear_vel',   0.5)
-        self.declare_parameter('max_vertical_vel', 0.5)   # was 0.08 — too slow
+        self.declare_parameter('max_vertical_vel', 0.08)
         self.declare_parameter('max_yaw_rate',     1.0)
-        self.declare_parameter('takeoff_height',   1.0)
+        self.declare_parameter('takeoff_height',   2.0)
 
+        # DOUBLE_ARRAY so ROS2 accepts any length list from launch file
         self.declare_parameter(
             'waypoints',
-            [0.0, 0.0, 1.0, 0.0],
+            [0.000,  0.000,  2.000,  0.0000,
+             0.000,  0.000,  2.000,  0.0000],
             ParameterDescriptor(
                 type=ParameterType.PARAMETER_DOUBLE_ARRAY,
-                description='Flat list [x,y,z,yaw, ...] of waypoints'
+                description='Flat list [x,y,z,yaw, x,y,z,yaw, ...]'
             )
         )
 
@@ -247,7 +310,7 @@ class DroneController(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = DroneController()
+    node = DroneControllerTraj()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()

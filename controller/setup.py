@@ -27,6 +27,7 @@ setup(
     entry_points={
         'console_scripts': [
             'drone_controller = controller.drone_controller:main',
+            'pid_controller_min_snap = controller.pid_controller_with_min_snap_trajectory:main'
         ],
     },
 )
