@@ -17,24 +17,43 @@ sudo apt install ros-humble-ros-gz-bridge ros-humble-ros-gz-sim
 
 ---
 
-## Workspace Structure
-
+## Codebase Structure
+```
 nlc_ws/
-├── src/
-│ ├── bebop_gz/ # Gazebo world generator, models, plugins
-│ │ ├── models/ # Parrot Bebop 2 SDF model
-│ │ ├── plugins/ # Custom Gazebo plugins (RobotPosePublisher, SetPosePlugin)
-│ │ ├── worlds/ # Generated world files
-│ │ └── world_generator.py # Generates world + bridge YAML for N drones
-│ ├── sim_env/ # ROS2 simulation environment package
-│ │ ├── config/ # bebop_bridge.yaml (ROS-GZ topic bridge)
-│ │ ├── launch/ # sim_env.launch.py
-│ │ └── sim_env/ # pose_odometry.py node
-│ └── controller/ # PID drone controller package
-│ ├── launch/ # controller.launch.py
-│ └── controller/ # drone_controller.py, pid.py, waypoint_manager.py
-
-
+└── src/
+    ├── bebop_gz/                        # Gazebo simulation package
+    │   ├── models/
+    │   │   └── parrot_bebop_2/          # Bebop 2 drone model
+    │   │       ├── meshes/              # 3D mesh files
+    │   │       ├── model.config
+    │   │       └── model.sdf
+    │   ├── plugins/                     # Custom Gazebo plugins
+    │   │   ├── build/
+    │   │   │   ├── libRobotPosePublisher.so
+    │   │   │   └── libSetPosePlugin.so
+    │   │   ├── RobotPosePublisher.cc
+    │   │   ├── RobotPosePublisher.hh
+    │   │   ├── SetPosePlugin.cc
+    │   │   ├── SetPosePlugin.hh
+    │   │   └── CMakeLists.txt
+    │   ├── worlds/
+    │   │   └── bebop_multi.world        # Multi-drone world file
+    │   └── world_generator.py           # Dynamic world generator
+    ├── sim_env/                         # Simulation environment package
+    │   ├── config/
+    │   │   └── bebop_bridge.yaml        # Bridge configuration
+    │   ├── launch/
+    │   │   └── sim_env.launch.py
+    │   └── sim_env/
+    │       └── pose_odometry.py
+    └── controller/                      # Drone controller package
+        ├── launch/
+        │   └── controller.launch.py
+        └── controller/
+            ├── drone_controller.py
+            ├── pid.py
+            └── waypoint_manager.py
+```
 ---
 
 ## Build
