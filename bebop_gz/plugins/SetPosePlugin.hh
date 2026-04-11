@@ -1,53 +1,44 @@
 #ifndef GZ_SIM_SYSTEMS_SETPOSEPLUGIN_HH_
 #define GZ_SIM_SYSTEMS_SETPOSEPLUGIN_HH_
-
-#include <ignition/gazebo/Model.hh>
-#include <ignition/gazebo/System.hh>
-#include <ignition/transport/Node.hh>
-#include <ignition/math/Pose3.hh>
-#include <ignition/math/Vector3.hh>
-#include <ignition/math/Quaternion.hh>
-#include <ignition/plugin/Register.hh>
-#include <ignition/msgs/pose.pb.h>
-#include <ignition/common/Console.hh>
+#include <gz/sim/Model.hh>
+#include <gz/sim/System.hh>
+#include <gz/transport/Node.hh>
+#include <gz/math/Pose3.hh>
+#include <gz/math/Vector3.hh>
+#include <gz/math/Quaternion.hh>
+#include <gz/plugin/Register.hh>
+#include <gz/msgs/pose.pb.h>
+#include <gz/common/Console.hh>
 #include <mutex>
 #include <optional>
 
-namespace ignition
+namespace gz
 {
-namespace gazebo
+namespace sim
 {
 namespace systems
 {
-
 class SetPosePlugin : public System, public ISystemConfigure, public ISystemPreUpdate
 {
 public:
-  // Constructor and destructor
   SetPosePlugin();
   virtual ~SetPosePlugin();
 
-  // Configure method to initialize the plugin
   void Configure(const Entity &entity, const std::shared_ptr<const sdf::Element> &sdf,
                  EntityComponentManager &ecm, EventManager &eventMgr) override;
 
-  // PreUpdate method to update the model's pose before each simulation step
   void PreUpdate(const UpdateInfo &info, EntityComponentManager &ecm) override;
 
 private:
-  // Callback method to handle incoming pose messages
-  void OnPoseMsg(const ignition::msgs::Pose &msg);
+  void OnPoseMsg(const gz::msgs::Pose &msg);
 
-  // Member variables
-  Model model; // The model associated with this plugin
-  std::string topic; // The topic to subscribe to for pose messages
-  std::unique_ptr<ignition::transport::Node> node; // The transport node for communication
-  std::optional<ignition::math::Pose3d> newPose; // The new pose to set for the model
-  std::mutex mutex; // Mutex to protect access to newPose
+  Model model;
+  std::string topic;
+  std::unique_ptr<gz::transport::Node> node;
+  std::optional<gz::math::Pose3d> newPose;
+  std::mutex mutex;
 };
-
 } // namespace systems
-} // namespace gazebo
-} // namespace ignition
-
+} // namespace sim
+} // namespace gz
 #endif // GZ_SIM_SYSTEMS_SETPOSEPLUGIN_HH_

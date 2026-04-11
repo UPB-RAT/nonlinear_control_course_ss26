@@ -1,8 +1,8 @@
 #include "RobotPosePublisher.hh"
 
-#include <ignition/msgs/pose.pb.h>
-#include <ignition/msgs/pose_v.pb.h>
-#include <ignition/msgs/time.pb.h>
+#include <gz/msgs/pose.pb.h>
+#include <gz/msgs/pose_v.pb.h>
+#include <gz/msgs/time.pb.h>
 
 #include <stack>
 #include <string>
@@ -13,10 +13,10 @@
 
 #include <sdf/Joint.hh>
 
-#include <ignition/common/Profiler.hh>
-#include <ignition/math/Pose3.hh>
-#include <ignition/plugin/Register.hh>
-#include <ignition/transport/Node.hh>
+#include <gz/common/Profiler.hh>
+#include <gz/math/Pose3.hh>
+#include <gz/plugin/Register.hh>
+#include <gz/transport/Node.hh>
 
 #include "gz/sim/Util.hh"
 #include "gz/sim/components/CanonicalLink.hh"
@@ -35,19 +35,16 @@
 #include "gz/sim/Conversions.hh"
 #include "gz/sim/Model.hh"
 
-using namespace ignition;
-using namespace gazebo;
-namespace ignition { namespace gazebo { inline namespace GZ_SIM_VERSION_NAMESPACE { namespace systems {
+using namespace gz;
+using namespace sim;
 
+namespace gz { namespace sim { inline namespace GZ_SIM_VERSION_NAMESPACE { namespace systems {
 
 class RobotPosePublisherPrivate
 {
   public: void InitializeEntitiesToPublish(const EntityComponentManager &_ecm);
-
   public: void FillPoses(const EntityComponentManager &_ecm,
-      std::vector<std::pair<Entity, math::Pose3d>> &_poses,
-      bool _static);
-
+      std::vector<std::pair<Entity, math::Pose3d>> &_poses, bool _static);
   public: void PublishPoses(
       std::vector<std::pair<Entity, math::Pose3d>> &_poses,
       const msgs::Time &_stampMsg,
@@ -65,44 +62,33 @@ class RobotPosePublisherPrivate
   public: msgs::Pose_V poseVMsg;
   public: bool usePoseV = false;
   public: bool initialized{false};
-
-  // Add the model variable
   public: Model model{kNullEntity};
-
-  // Add a variable to store the custom topic
   public: std::string customTopic;
 };
 
-//////////////////////////////////////////////////
 RobotPosePublisher::RobotPosePublisher()
   : dataPtr(std::make_unique<RobotPosePublisherPrivate>())
 {
-  // Initialize the model variable
   this->dataPtr->model = Model();
 }
 
-//////////////////////////////////////////////////
 void RobotPosePublisher::Configure(const Entity &_entity,
     const std::shared_ptr<const sdf::Element> &_sdf,
     EntityComponentManager &_ecm,
     EventManager &/*_eventMgr*/)
 {
-  // Initialize the model with the entity
   this->dataPtr->model = Model(_entity);
-
   if (!this->dataPtr->model.Valid(_ecm))
   {
-    ignerr << "RobotPosePublisher plugin should be attached to a model entity. "
+    gzerr << "RobotPosePublisher plugin should be attached to a model entity. "
       << "Failed to initialize." << std::endl;
     return;
   }
 
-  // Parse optional params
   this->dataPtr->usePoseV =
     _sdf->Get<bool>("use_pose_vector_msg", this->dataPtr->usePoseV).first;
 
   double updateFrequency = _sdf->Get<double>("update_frequency", -1).first;
-
   if (updateFrequency > 0)
   {
     std::chrono::duration<double> period{1 / updateFrequency};
@@ -112,45 +98,6 @@ void RobotPosePublisher::Configure(const Entity &_entity,
 
   this->dataPtr->customTopic = this->dataPtr->model.Name(_ecm) + "/pose";
 
-  
-  // if (_sdf->HasElement("topic"))
-  // {
-  //     this->dataPtr->customTopic = _sdf->Get<std::string>("topic");
-  // }
-  // else
-  // {
-  //     // Construir el topic de pose basado en el nombre del modelo
-  //     this->dataPtr->customTopic = "/model/" + this->dataPtr->model.Name(_ecm) + "/pose";
-
-  //     if (this->dataPtr->customTopic.empty())
-  //     {
-  //         this->dataPtr->customTopic = "/pose";
-  //         ignerr << "Empty pose topic generated for pose_publisher system. "
-  //               << "Setting to " << this->dataPtr->customTopic << std::endl;
-  //     }
-  // }
-
-
-
-
-  // // Read the custom topic from the SDF
-  // if (_sdf->HasElement("topic"))
-  // {
-  //   this->dataPtr->customTopic = _sdf->Get<std::string>("topic");
-  // }
-  // else
-  // {
-  //   // Default topic if not specified
-  //   this->dataPtr->customTopic = topicFromScopedName(_entity, _ecm, true) + "/pose";
-  //   if (this->dataPtr->customTopic.empty())
-  //   {
-  //     this->dataPtr->customTopic = "/pose";
-  //     ignerr << "Empty pose topic generated for pose_publisher system. "
-  //            << "Setting to " << this->dataPtr->customTopic << std::endl;
-  //   }
-  // }
-
-  // Create publisher
   if (this->dataPtr->usePoseV)
   {
     this->dataPtr->posePub =
@@ -163,15 +110,14 @@ void RobotPosePublisher::Configure(const Entity &_entity,
   }
 }
 
-//////////////////////////////////////////////////
 void RobotPosePublisher::PostUpdate(const UpdateInfo &_info,
     const EntityComponentManager &_ecm)
 {
-  IGN_PROFILE("RobotPosePublisher::PostUpdate");
+  GZ_PROFILE("RobotPosePublisher::PostUpdate");
 
   if (_info.dt < std::chrono::steady_clock::duration::zero())
   {
-    ignwarn << "Detected jump back in time ["
+    gzwarn << "Detected jump back in time ["
            << std::chrono::duration<double>(_info.dt).count()
            << "s]. System may not work properly." << std::endl;
   }
@@ -203,7 +149,6 @@ void RobotPosePublisher::PostUpdate(const UpdateInfo &_info,
   this->dataPtr->lastPosePubTime = _info.simTime;
 }
 
-//////////////////////////////////////////////////
 void RobotPosePublisherPrivate::InitializeEntitiesToPublish(
     const EntityComponentManager &_ecm)
 {
@@ -226,8 +171,7 @@ void RobotPosePublisherPrivate::InitializeEntitiesToPublish(
       auto entityName = _ecm.Component<components::Name>(entity);
       if (!entityName)
         continue;
-      childFrame =
-        removeParentScope(scopedName(entity, _ecm, "::", false), "::");
+      childFrame = removeParentScope(scopedName(entity, _ecm, "::", false), "::");
 
       if (parent)
       {
@@ -241,48 +185,37 @@ void RobotPosePublisherPrivate::InitializeEntitiesToPublish(
       this->entitiesToPublish[entity] = std::make_pair(frame, childFrame);
     }
 
-    // Recursively check child entities
     auto childEntities =
         _ecm.ChildrenByComponents(entity, components::ParentEntity(entity));
-
-    for (auto childIt = childEntities.rbegin(); childIt != childEntities.rend();
-         ++childIt)
+    for (auto childIt = childEntities.rbegin(); childIt != childEntities.rend(); ++childIt)
     {
       auto it = std::find(visited.begin(), visited.end(), *childIt);
       if (it == visited.end())
-      {
         toCheck.push(*childIt);
-      }
     }
   }
-
   this->poses.reserve(this->entitiesToPublish.size());
 }
 
-//////////////////////////////////////////////////
 void RobotPosePublisherPrivate::FillPoses(const EntityComponentManager &_ecm,
     std::vector<std::pair<Entity, math::Pose3d>> &_poses, bool _static)
 {
-  IGN_PROFILE("RobotPosePublisher::FillPose");
-
+  GZ_PROFILE("RobotPosePublisher::FillPose");
   for (const auto &entity : this->entitiesToPublish)
   {
     auto pose = _ecm.Component<components::Pose>(entity.first);
     if (!pose)
       continue;
-
     _poses.emplace_back(entity.first, pose->Data());
   }
 }
 
-//////////////////////////////////////////////////
 void RobotPosePublisherPrivate::PublishPoses(
     std::vector<std::pair<Entity, math::Pose3d>> &_poses,
     const msgs::Time &_stampMsg,
     transport::Node::Publisher &_publisher)
 {
-  IGN_PROFILE("RobotPosePublisher::PublishPoses");
-
+  GZ_PROFILE("RobotPosePublisher::PublishPoses");
   msgs::Pose *msg = nullptr;
   if (this->usePoseV)
     this->poseVMsg.Clear();
@@ -294,9 +227,7 @@ void RobotPosePublisherPrivate::PublishPoses(
       continue;
 
     if (this->usePoseV)
-    {
       msg = this->poseVMsg.add_pose();
-    }
     else
     {
       this->poseMsg.Clear();
@@ -326,19 +257,9 @@ void RobotPosePublisherPrivate::PublishPoses(
     _publisher.Publish(this->poseVMsg);
 }
 
-// IGNITION_ADD_PLUGIN(RobotPosePublisher,
-//                     System,
-//                     RobotPosePublisher::ISystemConfigure,
-//                     RobotPosePublisher::ISystemPostUpdate)
-// } } } }
+} } } }  // namespace gz::sim::systems
 
-// IGNITION_ADD_PLUGIN_ALIAS(RobotPosePublisher,
-//                           "ignition::gazebo::systems::RobotPosePublisher")
-
-IGNITION_ADD_PLUGIN(RobotPosePublisher,
-                    System,
-                    RobotPosePublisher::ISystemConfigure,
-                    RobotPosePublisher::ISystemPostUpdate)
-IGNITION_ADD_PLUGIN_ALIAS(RobotPosePublisher,
-                          "ignition::gazebo::systems::RobotPosePublisher")
-} } } }
+GZ_ADD_PLUGIN(gz::sim::systems::RobotPosePublisher, gz::sim::System,
+              gz::sim::systems::RobotPosePublisher::ISystemConfigure,
+              gz::sim::systems::RobotPosePublisher::ISystemPostUpdate)
+GZ_ADD_PLUGIN_ALIAS(gz::sim::systems::RobotPosePublisher, "gz::sim::systems::RobotPosePublisher")

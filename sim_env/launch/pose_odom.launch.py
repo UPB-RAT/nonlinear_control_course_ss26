@@ -33,7 +33,7 @@ def generate_launch_description():
 
     gz_plugin_path = SetEnvironmentVariable(
         name='GZ_SIM_SYSTEM_PLUGIN_PATH',
-        value=os.path.expanduser('~/nlc_ws/src/bebop_gz/plugins/build')
+        value=os.path.expanduser('~/nlc_ws/install/GazeboPlugins/lib')
     )
 
     # ── 1. World generator (runs immediately) ───────────────────────────────────
@@ -47,8 +47,6 @@ def generate_launch_description():
     )
 
     # ── 2. Gazebo simulator ─────────────────────────────────────────────────────
-    # FIXED: removed '-z 1000000' — it causes DART physics instability
-    #        with multirotor models under velocity control
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')
@@ -82,11 +80,6 @@ def generate_launch_description():
     )
 
     # ── Launch sequence ─────────────────────────────────────────────────────────
-    # FIXED: staggered startup so each component waits for the previous one
-    #   t=0s  → world_generator runs (fast Python script)
-    #   t=5s  → Gazebo launches (world file should be ready)
-    #   t=12s → bridge connects (Gazebo + physics fully loaded)
-    #   t=14s → odometry starts (bridge already alive)
     return LaunchDescription([
         gz_resource_path,
         gz_plugin_path,
