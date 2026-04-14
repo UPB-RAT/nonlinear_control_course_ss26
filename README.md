@@ -1,20 +1,33 @@
 # NLC Drone Simulation & Controller
 ![Bebop Drone Simulation](docs/robotic_systems.png)
 
-ROS2 Humble + Gazebo Ignition simulation of Parrot Bebop 2 drones with PID position control.
+ROS2 Humble + Gazebo Ignition (V6) simulation
+
+ROS2 Jazzy + Gazebo Harmonic (V8) simulation
 
 ---
 
 ## Prerequisites
-
+# Option 1:
 - Ubuntu 22.04
 - ROS2 Humble
 - Gazebo Ignition (Fortress or Garden)
 - Python 3.10+
 
+# Option 2:
+- Ubuntu 24.04
+- ROS2 Jazzy
+- Gazebo Harmonic
+- Python 3.10+
+
 ```bash
 sudo apt install ros-humble-ros-gz-bridge ros-humble-ros-gz-sim
+sudo apt install ros-jazzy-ros-gz-bridge ros-jazzy-ros-gz-sim
 ```
+
+## Notes:
+Choose the proper branch from GitHub according to your computer specification
+
 
 ---
 
@@ -78,22 +91,7 @@ source install/setup.bash
 ### Step 1 — Launch simulation environment
 
 ```bash
-ros2 launch sim_env sim_env.launch.py
-```
-
-This will:
-1. Generate the Gazebo world (`world_generator.py`) with 1 drone
-2. Launch Gazebo Ignition with the world file
-3. Start the ROS-GZ bridge (topics bridged after 12s)
-4. Start the pose odometry node (after 14s)
-
-To change the number of drones, edit `world_generator.py`:
-```python
-num_drones = 1   # default
-```
-Or pass as argument:
-```bash
-python3 src/bebop_gz/world_generator.py num_drones=3
+ros2 launch sim_env pose_odom.launch.py
 ```
 
 ### Step 2 — Launch the PID controller
