@@ -27,7 +27,20 @@ sudo apt install ros-jazzy-ros-gz-bridge ros-jazzy-ros-gz-sim
 
 ## Notes:
 Choose the proper branch from GitHub according to your computer specification
+## To clone the repo
+```bash
+# Create a nlc_ws/src folder
+mkdir -p nlc_ws/src
+# Navigate to src
+cd ~/nlc_ws/src
+# clone the repo 
+git clone https://github.com/UPB-RAT/nonlinear_control_course_ss26.git .
 
+# if you have UBUNTU 24.04, ROS Jazzy switch the branch
+git checkout -b ros_jazzy
+git pull
+# Now you are ready to try next steps
+```
 
 ---
 
