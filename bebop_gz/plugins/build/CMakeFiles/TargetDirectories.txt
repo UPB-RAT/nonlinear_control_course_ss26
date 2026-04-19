@@ -1,8 +1,0 @@
-/home/huyen-admin/nlc_ws/src/bebop_ros/bebop_gz/plugins/build/CMakeFiles/SetPosePlugin.dir
-/home/huyen-admin/nlc_ws/src/bebop_ros/bebop_gz/plugins/build/CMakeFiles/RobotPosePublisher.dir
-/home/huyen-admin/nlc_ws/src/bebop_ros/bebop_gz/plugins/build/CMakeFiles/edit_cache.dir
-/home/huyen-admin/nlc_ws/src/bebop_ros/bebop_gz/plugins/build/CMakeFiles/rebuild_cache.dir
-/home/huyen-admin/nlc_ws/src/bebop_ros/bebop_gz/plugins/build/CMakeFiles/list_install_components.dir
-/home/huyen-admin/nlc_ws/src/bebop_ros/bebop_gz/plugins/build/CMakeFiles/install.dir
-/home/huyen-admin/nlc_ws/src/bebop_ros/bebop_gz/plugins/build/CMakeFiles/install/local.dir
-/home/huyen-admin/nlc_ws/src/bebop_ros/bebop_gz/plugins/build/CMakeFiles/install/strip.dir

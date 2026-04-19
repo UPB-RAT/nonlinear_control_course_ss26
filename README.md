@@ -1,208 +1,120 @@
-# NLC Drone Simulation & Controller
-![Bebop Drone Simulation](docs/robotic_systems.png)
+# RAT-LAB PID Controller (ROS 2 Gazebo Drone Simulation)
 
-ROS2 Humble + Gazebo Ignition (V6) simulation
+This repository provides a ROS 2-based simulation environment for a drone running in **Gazebo**, along with nodes for pose listening and command publishing.
 
-ROS2 Jazzy + Gazebo Harmonic (V8) simulation
+It uses ROS 2 for communication between nodes and Gazebo for physics-based drone simulation.
 
 ---
 
-## Prerequisites
-# Option 1:
-- Ubuntu 22.04
-- ROS2 Humble
-- Gazebo Ignition (Fortress or Garden)
-- Python 3.10+
+## 📌 Features
 
-# Option 2:
-- Ubuntu 24.04
-- ROS2 Jazzy
-- Gazebo Harmonic
-- Python 3.10+
+* Drone simulation in Gazebo
+* ROS 2-based architecture
+* Launch file to spawn and control drone in simulation
+* Pose listener node for tracking drone state
+* Command publisher node for sending control inputs
+* Modular setup for testing PID control systems
+
+---
+
+## ⚙️ Prerequisites
+
+Make sure you have the following installed:
+
+* ROS 2 (Jazzy recommended)
+* Gazebo (compatible version with ROS 2 Jazzy)
+* `colcon` build tools
+* `git`
+
+Source ROS 2 before running any commands:
 
 ```bash
-sudo apt install ros-humble-ros-gz-bridge ros-humble-ros-gz-sim
-sudo apt install ros-jazzy-ros-gz-bridge ros-jazzy-ros-gz-sim
-```
-
-## Notes:
-Choose the proper branch from GitHub according to your computer specification
-## To clone the repo
-```bash
-# Create a nlc_ws/src folder
-mkdir -p nlc_ws/src
-# Navigate to src
-cd ~/nlc_ws/src
-# clone the repo 
-git clone https://github.com/UPB-RAT/nonlinear_control_course_ss26.git .
-
-# if you have UBUNTU 24.04, ROS Jazzy switch the branch
-git checkout -b ros_jazzy
-git pull
-# Now you are ready to try next steps
+source /opt/ros/jazzy/setup.bash
 ```
 
 ---
 
-## Codebase Structure
-```
-nlc_ws/
-└── src/
-    ├── bebop_gz/                        # Gazebo simulation package
-    │   ├── models/
-    │   │   └── parrot_bebop_2/          # Bebop 2 drone model
-    │   │       ├── meshes/              # 3D mesh files
-    │   │       ├── model.config
-    │   │       └── model.sdf
-    │   ├── plugins/                     # Custom Gazebo plugins
-    │   │   ├── build/
-    │   │   │   ├── libRobotPosePublisher.so
-    │   │   │   └── libSetPosePlugin.so
-    │   │   ├── RobotPosePublisher.cc
-    │   │   ├── RobotPosePublisher.hh
-    │   │   ├── SetPosePlugin.cc
-    │   │   ├── SetPosePlugin.hh
-    │   │   └── CMakeLists.txt
-    │   ├── worlds/
-    │   │   └── bebop_multi.world        # Multi-drone world file
-    │   └── world_generator.py           # Dynamic world generator
-    ├── sim_env/                         # Simulation environment package
-    │   ├── config/
-    │   │   └── bebop_bridge.yaml        # Bridge configuration
-    │   ├── launch/
-    │   │   └── sim_env.launch.py
-    │   └── sim_env/
-    │       └── pose_odometry.py
-    └── controller/                      # Drone controller package
-        ├── launch/
-        │   └── controller.launch.py
-        └── controller/
-            ├── drone_controller.py
-            ├── pid.py
-            └── waypoint_manager.py
-```
----
+## 📁 Workspace Setup
 
-## Build
+Create a ROS 2 workspace and clone the repository:
 
 ```bash
-cd ~/nlc_ws
+mkdir -p rat-lab-ws/src
+cd rat-lab-ws/src
+
+git clone https://github.com/ekansh-bajpai/rat-lab-pid-controller.git .
+```
+
+---
+
+## 🔨 Build Instructions
+
+From the workspace root:
+
+```bash
+cd ../..
 colcon build
+```
+
+After building, source the workspace:
+
+```bash
 source install/setup.bash
 ```
 
-To rebuild only specific packages:
+---
+
+## 🚀 Running the Simulation
+
+### 1. Launch Drone Simulation (Gazebo)
+
+In the first terminal:
+
 ```bash
-colcon build --packages-select sim_env controller
+source /opt/ros/jazzy/setup.bash
 source install/setup.bash
+
+ros2 launch drone_simulation sim.launch.py
 ```
+
+This will:
+
+* Start Gazebo
+* Spawn the drone model
+* Initialize simulation environment
 
 ---
 
-## Running the Simulation
+### 2. Start Pose Listener Node
 
-### Step 1 — Launch simulation environment
+Open a new terminal:
 
 ```bash
-ros2 launch sim_env pose_odom.launch.py
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+
+ros2 run drone_communication listener_node
 ```
 
-### Step 2 — Launch the PID controller
+This node:
 
-In a new terminal:
-```bash
-source ~/nlc_ws/install/setup.bash
-ros2 launch controller controller.launch.py
-```
-
-The drone will:
-1. Arm automatically after 2 seconds
-2. Fly to the default hover point `(x=0, y=0, z=1.0)`
-3. Hold position until a new goal is received
+* Subscribes to drone state/pose topics
+* Processes real-time position and orientation data
 
 ---
 
-## Sending Goals at Runtime
+### 3. Start Command Publisher Node
 
-### Simple point (x, y, z) — yaw unchanged
-
-```bash
-ros2 topic pub --once /bebop1/goal geometry_msgs/msg/Point \
-  "{x: 2.0, y: 1.0, z: 1.5}"
-```
-
-### Full pose (x, y, z + yaw)
+Open another terminal:
 
 ```bash
-ros2 topic pub --once /bebop1/goal_pose geometry_msgs/msg/Pose \
-  "{position: {x: 2.0, y: 1.0, z: 1.5}, orientation: {w: 1.0}}"
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+
+ros2 run drone_communication publisher_node
 ```
 
-### Return to origin
+This node:
 
-```bash
-ros2 topic pub --once /bebop1/goal geometry_msgs/msg/Point \
-  "{x: 0.0, y: 0.0, z: 1.0}"
-```
-
----
-
-## Monitoring
-
-```bash
-# Watch drone position
-ros2 topic echo /bebop1/pose
-
-# Watch velocity commands
-ros2 topic echo /bebop1/cmd_vel
-
-# List all active topics
-ros2 topic list
-```
-
----
-
-## PID Tuning
-
-Default gains in `drone_controller.py`:
-
-| Axis | Kp  | Ki   | Kd  | Max output |
-|------|-----|------|-----|------------|
-| X    | 0.5 | 0.08 | 0.4 | 0.5 m/s    |
-| Y    | 0.5 | 0.08 | 0.4 | 0.5 m/s    |
-| Z    | 0.2 | 0.02 | 0.1 | 0.08 m/s   |
-| Yaw  | 1.0 | 0.01 | 0.1 | 1.0 rad/s  |
-
-Override via launch arguments:
-```bash
-ros2 launch controller controller.launch.py \
-  pid_z.kp:=0.3 pid_z.ki:=0.03 takeoff_height:=1.5
-```
-
----
-
-## Gazebo Physics Parameters
-
-Key parameters in `world_generator.py`:
-
-| Parameter | Value | Description |
-|---|---|---|
-| `maxRotVelocity` | 400.0 rad/s | Max propeller speed |
-| `motorConstant` | 8.54858e-06 | Motor thrust coefficient |
-| `velocityGain` | 0.5 0.5 0.5 | Velocity controller gain |
-| `attitudeGain` | 0.3 0.5 0.05 | Attitude controller gain |
-| `angularRateGain` | 0.1 0.1 0.05 | Angular rate gain |
-| `maximumLinearAcceleration` | 0.5 0.5 0.5 | Max linear acceleration |
-
----
-
-## Troubleshooting
-
-| Problem | Solution |
-|---|---|
-| `ros2 topic list` fails with `rclpy.ok()` error | Run `ros2 daemon stop && ros2 daemon start` |
-| Drone flies away on takeoff | Check `world_generator.py` gains — regenerate world |
-| Bridge not forwarding `cmd_vel` | Set `lazy: false` for all `ROS_TO_GZ` topics in `bebop_bridge.yaml` |
-| x-axis drift at hover | Increase `pid_x.ki` or reduce `attitudeGain` x component |
-| Gazebo crashes on startup | Remove `-z 1000000` flag from `gz_args` in `sim_env.launch.py` |
-| World file not updating | Edit `world_generator.py` directly — it regenerates the world on every launch |
+* Publishes control commands to the drone
+* Can be extended for PID tuning and trajectory control
