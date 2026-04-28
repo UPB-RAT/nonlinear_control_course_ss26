@@ -6,10 +6,10 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from turtlesim.msg import Pose
 
-from utils.math_utils import normalize_angle
-from utils.pid import PID
-from utils.trajectory import Figure8Trajectory, SquareTrajectory
-from utils.dashboard import LivePIDDashboard
+from turtlesim_controller.utils.math_utils import normalize_angle
+from turtlesim_controller.utils.pid import PID
+from turtlesim_controller.utils.trajectory import Figure8Trajectory, SquareTrajectory
+from turtlesim_controller.utils.dashboard import LivePIDDashboard
 
 
 class Controller(Node):
@@ -93,7 +93,7 @@ class Controller(Node):
 
         cmd = Twist()
 
-        # simple switching controller
+        # simple switching controller (same as Claude logic)
         if abs(heading_error) < 0.35:
             cmd.linear.x = self.dist_pid.compute(dist)
         else:

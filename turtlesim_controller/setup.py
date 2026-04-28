@@ -10,6 +10,10 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/resource', ['resource/traj.json']),
+        ('share/' + package_name + '/resource', ['resource/butterfly.json']),
+        ('share/' + package_name + '/resource', ['resource/flower.json']),
+        ('share/' + package_name + '/resource', ['resource/star.json']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -24,7 +28,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'pid_controller_node = turtlesim_controller.pid_controller_node:main'
+            'pid_controller_node = turtlesim_controller.pid_controller_node:main',
+            "pid4kinematicmodel_node = turtlesim_controller.kinematic_model:main"
         ],
     },
 )

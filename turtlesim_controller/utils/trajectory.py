@@ -1,4 +1,8 @@
 import math
+import numpy as np
+from scipy.interpolate import CubicSpline
+import json
+
 
 class Figure8Trajectory:
 
@@ -36,7 +40,7 @@ class SquareTrajectory:
     def step(self, dt):
         self.t += self.speed * dt
 
-        # parameterized square using superellipse (Lamé curve)
+        # parameterized square using superellipse
         # x = cos(t)^(2/n), y = sin(t)^(2/n)
 
         c = math.cos(self.t)
@@ -61,3 +65,126 @@ class SquareTrajectory:
         dy = (y2 - y) / eps * self.speed
 
         return x, y, dx, dy
+    
+# class WaypointTrajectory:
+#     def __init__(self, json_file, speed=1.0):
+
+#         self.speed = speed
+#         self.t = 0.0
+
+#         # ---------------------------
+#         # Load waypoints
+#         # ---------------------------
+#         with open(json_file, 'r') as f:
+#             data = json.load(f)
+
+#         pts = np.array(data["waypoints"], dtype=float)
+
+#         if len(pts) < 2:
+#             raise ValueError("Trajectory needs at least 2 waypoints")
+
+#         x = pts[:, 0]
+#         y = pts[:, 1]
+
+#         # ---------------------------
+#         # Arc-length parameterization
+#         # ---------------------------
+#         diffs = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+#         s = np.insert(np.cumsum(diffs), 0, 0.0)
+
+#         self.s_max = s[-1]
+
+#         # avoid divide-by-zero if all points identical
+#         if self.s_max == 0:
+#             raise ValueError("Waypoints must not all be identical")
+
+#         # ---------------------------
+#         # Smooth spline path
+#         # ---------------------------
+#         self.xs = CubicSpline(s, x)
+#         self.ys = CubicSpline(s, y)
+
+#     def step(self, dt):
+
+#         # advance along arc-length
+#         self.t += self.speed * dt
+#         self.t = min(self.t, self.s_max)
+
+#         # ---------------------------
+#         # Position
+#         # ---------------------------
+#         x = self.xs(self.t)
+#         y = self.ys(self.t)
+
+#         # ---------------------------
+#         # Velocity (tangent)
+#         # ---------------------------
+#         dx = self.xs(self.t, 1) * self.speed
+#         dy = self.ys(self.t, 1) * self.speed
+
+#         return float(x), float(y), float(dx), float(dy)
+
+class WaypointTrajectory:
+    def __init__(self, json_file, speed=1.0):
+
+        self.speed = speed
+        self.t = 0.0
+
+        # ---------------------------
+        # Load waypoints
+        # ---------------------------
+        with open(json_file, 'r') as f:
+            data = json.load(f)
+
+        pts = np.array(data["waypoints"], dtype=float)
+
+        if len(pts) < 3:
+            raise ValueError("Need at least 3 waypoints for periodic spline")
+
+        # ---------------------------
+        # FORCE CLOSED LOOP (important for periodic spline)
+        # ---------------------------
+        if not np.allclose(pts[0], pts[-1]):
+            pts = np.vstack([pts, pts[0]])
+
+        x = pts[:, 0]
+        y = pts[:, 1]
+
+        # ---------------------------
+        # Arc-length parameterization
+        # ---------------------------
+        diffs = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+        s = np.insert(np.cumsum(diffs), 0, 0.0)
+
+        self.s_max = s[-1]
+
+        if self.s_max == 0:
+            raise ValueError("Invalid waypoints (all identical)")
+
+        # ---------------------------
+        # PERIODIC SPLINES
+        # ---------------------------
+        self.xs = CubicSpline(s, x, bc_type="periodic")
+        self.ys = CubicSpline(s, y, bc_type="periodic")
+
+    def step(self, dt):
+
+        # ---------------------------
+        # wrap-around motion (infinite loop)
+        # ---------------------------
+        self.t += self.speed * dt
+        self.t = self.t % self.s_max
+
+        # ---------------------------
+        # Position
+        # ---------------------------
+        x = self.xs(self.t)
+        y = self.ys(self.t)
+
+        # ---------------------------
+        # Velocity (tangent)
+        # ---------------------------
+        dx = self.xs(self.t, 1) * self.speed
+        dy = self.ys(self.t, 1) * self.speed
+
+        return float(x), float(y), float(dx), float(dy)
