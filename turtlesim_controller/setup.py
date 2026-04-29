@@ -29,7 +29,7 @@ setup(
     entry_points={
         'console_scripts': [
             'pid_controller_node = turtlesim_controller.pid_controller_node:main',
-            "pid4kinematicmodel_node = turtlesim_controller.kinematic_model:main"
+            "trajectory_controller_node = turtlesim_controller.trajectory_tracking_controller:main"
         ],
     },
 )

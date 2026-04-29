@@ -38,7 +38,7 @@ class Controller(Node):
         pkg_path = get_package_share_directory('turtlesim_controller')
         json_file = os.path.join(pkg_path, 'resource', traj_file)
         # call:
-        # ros2 run turtlesim_controller pid4kinematicmodel_node --ros-args -p traj_file:=flower.json
+        # ros2 run turtlesim_controller trajectory_tracking_controller_node --ros-args -p traj_file:=flower.json
 
         # TODO: use launch.py
         '''
