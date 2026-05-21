@@ -42,7 +42,12 @@ Create a ROS 2 workspace and clone the repository:
 mkdir -p rat-lab-ws/src
 cd rat-lab-ws/src
 
-git clone https://github.com/ekansh-bajpai/rat-lab-pid-controller.git .
+git clone -b pid-controller https://github.com/UPB-RAT/nonlinear_control_course_ss26.git
+
+shopt -s dotglob
+mv nonlinear_control_course_ss26/* .
+rmdir nonlinear_control_course_ss26
+
 ```
 
 ---
