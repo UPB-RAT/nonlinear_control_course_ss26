@@ -93,7 +93,10 @@ bash
 Copy
 
 ```bash
-source /opt/ros/jazzy/setup.bashsource install/setup.bashros2 launch drone_simulation twist.sim.launch.py
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+
+ros2 launch drone_simulation twist.sim.launch.py
 ```
 
 This will:
@@ -113,7 +116,10 @@ bash
 Copy
 
 ```bash
-source /opt/ros/jazzy/setup.bashsource install/setup.bashros2 launch drone_pid_controller drone_twist.launch.py 
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+
+ros2 launch drone_pid_controller drone_twist.launch.py 
 ```
 
 ---
@@ -127,7 +133,10 @@ bash
 Copy
 
 ```bash
-source /opt/ros/jazzy/setup.bashsource install/setup.bashros2 launch drone_pid_controller drone_twist_snap.launch.py 
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+
+ros2 launch drone_pid_controller drone_twist_snap.launch.py 
 ```
 
 ## 🚀 Instructions for Homework 1, Question 3 submission
@@ -143,7 +152,10 @@ bash
 Copy
 
 ```bash
-source /opt/ros/jazzy/setup.bashsource install/setup.bashros2 launch drone_simulation sim.launch.py
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+
+ros2 launch drone_simulation sim.launch.py
 ```
 
 This will:
@@ -163,7 +175,10 @@ bash
 Copy
 
 ```bash
-source /opt/ros/jazzy/setup.bashsource install/setup.bashros2 launch drone_pid_controller drone.launch.py 
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+
+ros2 launch drone_pid_controller drone.launch.py 
 ```
 
 ---
