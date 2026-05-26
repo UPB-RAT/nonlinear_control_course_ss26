@@ -100,6 +100,7 @@ class QuadcopterPID(Node):
         # 3. Z position
         # 4. Roll stabilization
         # 5. Pitch stabilization
+        # 6. Yaw stabilization
 
         # Example:
 
