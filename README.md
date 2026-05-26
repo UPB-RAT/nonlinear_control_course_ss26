@@ -47,7 +47,11 @@ bash
 Copy
 
 ```bash
-mkdir -p rat-lab-ws/srccd rat-lab-ws/srcgit clone -b pid-controller https://github.com/UPB-RAT/nonlinear_control_course_ss26.gitshopt -s dotglob && mv nonlinear_control_course_ss26/* . && rmdir nonlinear_control_course_ss26
+mkdir -p rat-lab-ws/src
+cd rat-lab-ws/src
+
+git clone -b pid-controller https://github.com/UPB-RAT/nonlinear_control_course_ss26.git
+shopt -s dotglob && mv nonlinear_control_course_ss26/* . && rmdir nonlinear_control_course_ss26
 ```
 
 ---
