@@ -224,12 +224,12 @@ control_alloc --> motors["omega_0 | omega_1 | omega_2 | omega_3"]
 y_sum((y_error))
 y_desired[y_desired] --> y_sum
 y_actual[y_actual] --> y_sum
-y_sum --> y_pid[PID] --> pitch_desired
+y_sum --> y_pid[PID] --> roll_desired
 
 x_sum((x_error))
 x_desired[x_desired] --> x_sum
 x_actual[x_actual] --> x_sum
-x_sum --> x_pid[PID] --> roll_desired
+x_sum --> x_pid[PID] --> pitch_desired
 ```
 ## Base Speed Calculation (System Dynamics)
 
