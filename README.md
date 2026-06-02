@@ -47,11 +47,7 @@ bash
 Copy
 
 ```bash
-mkdir -p rat-lab-ws/src
-cd rat-lab-ws/src
-
-git clone -b pid-controller https://github.com/UPB-RAT/nonlinear_control_course_ss26.git
-shopt -s dotglob && mv nonlinear_control_course_ss26/* . && rmdir nonlinear_control_course_ss26
+mkdir -p rat-lab-ws/srccd rat-lab-ws/srcgit clone -b pid-controller https://github.com/UPB-RAT/nonlinear_control_course_ss26.gitshopt -s dotglob && mv nonlinear_control_course_ss26/* . && rmdir nonlinear_control_course_ss26
 ```
 
 ---
@@ -93,10 +89,7 @@ bash
 Copy
 
 ```bash
-source /opt/ros/jazzy/setup.bash
-source install/setup.bash
-
-ros2 launch drone_simulation twist.sim.launch.py
+source /opt/ros/jazzy/setup.bashsource install/setup.bashros2 launch drone_simulation twist.sim.launch.py
 ```
 
 This will:
@@ -116,10 +109,7 @@ bash
 Copy
 
 ```bash
-source /opt/ros/jazzy/setup.bash
-source install/setup.bash
-
-ros2 launch drone_pid_controller drone_twist.launch.py 
+source /opt/ros/jazzy/setup.bashsource install/setup.bashros2 launch drone_pid_controller drone_twist.launch.py 
 ```
 
 ---
@@ -133,10 +123,7 @@ bash
 Copy
 
 ```bash
-source /opt/ros/jazzy/setup.bash
-source install/setup.bash
-
-ros2 launch drone_pid_controller drone_twist_snap.launch.py 
+source /opt/ros/jazzy/setup.bashsource install/setup.bashros2 launch drone_pid_controller drone_twist_snap.launch.py 
 ```
 
 ## 🚀 Instructions for Homework 1, Question 3 submission
@@ -152,10 +139,7 @@ bash
 Copy
 
 ```bash
-source /opt/ros/jazzy/setup.bash
-source install/setup.bash
-
-ros2 launch drone_simulation sim.launch.py
+source /opt/ros/jazzy/setup.bashsource install/setup.bashros2 launch drone_simulation sim.launch.py
 ```
 
 This will:
@@ -175,10 +159,7 @@ bash
 Copy
 
 ```bash
-source /opt/ros/jazzy/setup.bash
-source install/setup.bash
-
-ros2 launch drone_pid_controller drone.launch.py 
+source /opt/ros/jazzy/setup.bashsource install/setup.bashros2 launch drone_pid_controller drone.launch.py 
 ```
 
 ---
@@ -224,12 +205,12 @@ control_alloc --> motors["omega_0 | omega_1 | omega_2 | omega_3"]
 y_sum((y_error))
 y_desired[y_desired] --> y_sum
 y_actual[y_actual] --> y_sum
-y_sum --> y_pid[PID] --> roll_desired
+y_sum --> y_pid[PID] --> pitch_desired
 
 x_sum((x_error))
 x_desired[x_desired] --> x_sum
 x_actual[x_actual] --> x_sum
-x_sum --> x_pid[PID] --> pitch_desired
+x_sum --> x_pid[PID] --> roll_desired
 ```
 ## Base Speed Calculation (System Dynamics)
 

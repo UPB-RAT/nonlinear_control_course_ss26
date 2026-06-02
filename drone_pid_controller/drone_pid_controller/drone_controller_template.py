@@ -93,47 +93,32 @@ class QuadcopterPID(Node):
         # PID Controllers
         # =====================================================
 
-        # Position controllers
-        self.pid_x = PID(
-            kp=80.0,
-            ki=1.0,
-            kd=50.0,
-            output_limit=5.0,
-            integral_limit=50.0
-        )
+        # TODO:
+        # Create PID controllers for:
+        # 1. X position
+        # 2. Y position
+        # 3. Z position
+        # 4. Roll stabilization
+        # 5. Pitch stabilization
+        # 6. Yaw stabilization
 
-        self.pid_y = PID(
-            kp=80.0,
-            ki=1.0,
-            kd=50.0,
-            output_limit=5.0,
-            integral_limit=50.0
-        )
+        # Example:
 
-        self.pid_z = PID(
-            kp=80.0,
-            ki=1.0,
-            kd=50.0,
-            output_limit=200.0,
-            integral_limit=15.0
-        )
+        # self.pid_x = PID(
+        #     kp=80.0,
+        #     ki=1.0,
+        #     kd=50.0,
+        #     output_limit=5.0,
+        #     integral_limit=50.0
+        # )
 
-        # Attitude controllers
-        self.pid_roll = PID(
-            kp=0.1,
-            ki=0.0,
-            kd=1.0,
-            output_limit=100.0,
-            integral_limit=10.0
-        )
-
-        self.pid_pitch = PID(
-            kp=0.1,
-            ki=0.0,
-            kd=1.0,
-            output_limit=100.0,
-            integral_limit=10.0
-        )
+        # self.pid_roll = PID(
+        #     kp=0.1,
+        #     ki=0.0,
+        #     kd=1.0,
+        #     output_limit=100.0,
+        #     integral_limit=10.0
+        # )
 
         # =====================================================
         # Timing
@@ -184,9 +169,9 @@ class QuadcopterPID(Node):
             self.current_pose.orientation.z
         )
 
-        # ==========================================
+        # =====================================================
         # Publish path
-        # ==========================================
+        # =====================================================
 
         pose = PoseStamped()
 
@@ -232,95 +217,132 @@ class QuadcopterPID(Node):
         )
 
         # =====================================================
-        # Position errors
+        # TODO:
+        # Compute position errors
+        #
+        # Formula:
+        # error = target - current
+        #
+        # Example:
+        # err_x = tx - self.current_x
+        # err_y = ty - self.current_y
+        # err_z = tz - self.current_z
         # =====================================================
 
-        err_x = tx - self.current_x
-        err_y = ty - self.current_y
-        err_z = tz - self.current_z
-
         # =====================================================
-        # Altitude controller
-        # =====================================================
-
-        omega_z = self.pid_z.compute(
-            err_z,
-            dt
-        )
-
-        # =====================================================
-        # Position controller
-        # Position -> desired angles
+        # TODO:
+        # Implement altitude PID controller
+        #
+        # Use the Z-axis PID controller to compute
+        # vertical motor correction.
+        #
+        # Example:
+        # omega_z = self.pid_z.compute(
+        #     err_z,
+        #     dt
+        # )
         # =====================================================
 
-        desired_roll = self.pid_y.compute(
-            err_y,
-            dt
-        )
-
-        desired_pitch = self.pid_x.compute(
-            err_x,
-            dt
-        )
-
-        desired_roll = clamp(
-            desired_roll,
-            -5.0,
-            5.0
-        )
-
-        desired_pitch = clamp(
-            desired_pitch,
-            -5.0,
-            5.0
-        )
-
         # =====================================================
-        # Attitude controller
+        # TODO:
+        # Implement position controller
+        #
+        # Convert X and Y position errors into
+        # desired roll and pitch angles.
+        #
+        # Example:
+        # desired_roll = self.pid_y.compute(
+        #     err_y,
+        #     dt
+        # )
+        #
+        # desired_pitch = self.pid_x.compute(
+        #     err_x,
+        #     dt
+        # )
         # =====================================================
 
-        roll_error = -desired_roll - self.roll
-        pitch_error = desired_pitch - self.pitch
-
-        omega_roll = self.pid_roll.compute(
-            roll_error,
-            dt
-        )
-
-        omega_pitch = self.pid_pitch.compute(
-            pitch_error,
-            dt
-        )
+        # =====================================================
+        # TODO:
+        # Clamp desired roll and pitch angles
+        #
+        # Example:
+        # desired_roll = clamp(
+        #     desired_roll,
+        #     -5.0,
+        #     5.0
+        # )
+        #
+        # desired_pitch = clamp(
+        #     desired_pitch,
+        #     -5.0,
+        #     5.0
+        # )
+        # =====================================================
 
         # =====================================================
-        # Motor Mixing
+        # TODO:
+        # Compute roll and pitch errors
+        #
+        # Example:
+        # roll_error = -desired_roll - self.roll
+        # pitch_error = desired_pitch - self.pitch
         # =====================================================
 
-        base_speed = 636.0
+        # =====================================================
+        # TODO:
+        # Implement attitude PID controllers
+        #
+        # Example:
+        # omega_roll = self.pid_roll.compute(
+        #     roll_error,
+        #     dt
+        # )
+        #
+        # omega_pitch = self.pid_pitch.compute(
+        #     pitch_error,
+        #     dt
+        # )
+        # =====================================================
 
-        motor0 = clamp(
-            base_speed - omega_roll - omega_pitch + omega_z,
-            400.0,
-            800.0
-        )
+        # =====================================================
+        # TODO:
+        # Define base motor speed
+        #
+        # Example:
+        # base_speed = 636.0
+        # =====================================================
 
-        motor1 = clamp(
-            base_speed + omega_roll + omega_pitch + omega_z,
-            400.0,
-            800.0
-        )
-
-        motor2 = clamp(
-            base_speed + omega_roll - omega_pitch + omega_z,
-            400.0,
-            800.0
-        )
-
-        motor3 = clamp(
-            base_speed - omega_roll + omega_pitch + omega_z,
-            400.0,
-            800.0
-        )
+        # =====================================================
+        # TODO:
+        # Implement motor mixing equations
+        #
+        # Example:
+        #
+        # motor0 = clamp(
+        #     base_speed - omega_roll - omega_pitch + omega_z,
+        #     400.0,
+        #     800.0
+        # )
+        #
+        # motor1 = clamp(
+        #     base_speed + omega_roll + omega_pitch + omega_z,
+        #     400.0,
+        #     800.0
+        # )
+        #
+        # motor2 = clamp(
+        #     base_speed + omega_roll - omega_pitch + omega_z,
+        #     400.0,
+        #     800.0
+        # )
+        #
+        # motor3 = clamp(
+        #     base_speed - omega_roll + omega_pitch + omega_z,
+        #     400.0,
+        #     800.0
+        # )
+        # =====================================================
 
         # =====================================================
         # Publish actuator command
@@ -331,28 +353,34 @@ class QuadcopterPID(Node):
         cmd.header = Header()
         cmd.header.stamp = now.to_msg()
 
-        cmd.velocity = [
-            motor0,
-            motor1,
-            motor2,
-            motor3
-        ]
+        # =====================================================
+        # TODO:
+        # Assign motor speeds to cmd.velocity
+        #
+        # Example:
+        # cmd.velocity = [
+        #     motor0,
+        #     motor1,
+        #     motor2,
+        #     motor3
+        # ]
+        # =====================================================
 
         self.motor_pub.publish(cmd)
 
         # =====================================================
-        # Logging
+        # TODO:
+        # Add logging information
+        #
+        # Example:
+        #
+        # self.get_logger().info(
+        #     f"Target=({tx:.2f}, {ty:.2f}, {tz:.2f}) "
+        #     f"Position=({self.current_x:.2f}, "
+        #     f"{self.current_y:.2f}, "
+        #     f"{self.current_z:.2f})"
+        # )
         # =====================================================
-
-        self.get_logger().info(
-            f"[{self.traj_type}] "
-            f"T=({tx:.2f}, {ty:.2f}, {tz:.2f}) "
-            f"P=({self.current_x:.2f}, {self.current_y:.2f}, {self.current_z:.2f}) "
-            f"RP=({self.roll:.2f}, {self.pitch:.2f}) "
-            f"DesiredRP=({desired_roll:.2f}, {desired_pitch:.2f}) "
-            f"M=({motor0:.1f}, {motor1:.1f}, {motor2:.1f}, {motor3:.1f})",
-            throttle_duration_sec=0.5
-        )
 
     # =========================================================
     # Parameters
@@ -362,7 +390,7 @@ class QuadcopterPID(Node):
 
         self.declare_parameter(
             "trajectory",
-            "circle"
+            "figure8"
         )
 
         # Figure 8
@@ -428,7 +456,7 @@ class QuadcopterPID(Node):
     # =========================================================
 
     def get_trajectory_params(self):
-        
+
         if self.traj_type == "figure8":
 
             return {
@@ -436,7 +464,7 @@ class QuadcopterPID(Node):
                 "w": self.get_parameter("w").value,
                 "height": self.get_parameter("height").value
             }
-        
+
         elif self.traj_type == "circle":
 
             return {

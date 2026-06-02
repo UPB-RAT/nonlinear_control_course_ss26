@@ -1,0 +1,93 @@
+<?xml version="1.0"?>
+
+<sdf version="1.8">
+
+  <world name="warehouse">
+
+    <physics type="ode"/>
+
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Ground Plane</uri>
+    </include>
+
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Sun</uri>
+    </include>
+
+    <!-- Wall 1 -->
+    <model name="wall_1">
+      <static>true</static>
+
+      <link name="link">
+
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>5 0.2 1</size>
+            </box>
+          </geometry>
+        </collision>
+
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>5 0.2 1</size>
+            </box>
+          </geometry>
+        </visual>
+
+      </link>
+
+      <pose>2 2 0.5 0 0 0</pose>
+
+    </model>
+
+    <!-- Obstacle -->
+
+    <model name="box_obstacle">
+
+      <static>true</static>
+
+      <link name="link">
+
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>1 1 1</size>
+            </box>
+          </geometry>
+        </collision>
+
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1 1 1</size>
+            </box>
+          </geometry>
+        </visual>
+
+      </link>
+
+      <pose>3 0 0.5 0 0 0</pose>
+
+    </model>
+
+    <include>
+      <uri>model://obstacle_box</uri>
+      <pose>0 3 0.5 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/mihaiml/models/EXPLORER_R2_SENSOR_CONFIG_2</uri>
+      <pose>1 -2 0.5 0 0 0</pose>
+    </include>
+      
+
+    <include>
+      <uri>model://Robotika_Freyja_Sensor_Config_2</uri>
+      <pose>3 -4 0.5 0 0 0</pose>
+    </include>
+    
+  </world>
+
+</sdf>
