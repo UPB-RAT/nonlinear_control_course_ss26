@@ -13,6 +13,7 @@ setup(
         ('share/' + package_name + '/launch', ['launch/drone.launch.py']),
         ('share/' + package_name + '/launch', ['launch/drone_twist.launch.py']),
         ('share/' + package_name + '/launch', ['launch/drone_twist_snap.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/fl_drone.launch.py']),
         ('share/' + package_name + '/config', ['config/drone_view.rviz']),
     ],
     install_requires=['setuptools'],
@@ -31,6 +32,7 @@ setup(
             'controller_node = drone_pid_controller.drone_controller:main',
             'twist_controller_node = drone_pid_controller.drone_twist_controller:main',
             'snap_controller_node = drone_pid_controller.drone_twist_controller_with_min_snap:main',
+            'fl_controller_node = drone_pid_controller.drone_fl_controller:main'
         ],
     },
 )

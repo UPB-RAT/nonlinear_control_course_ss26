@@ -294,3 +294,43 @@ The difference from the analytical value (~656 rad/s) is due to:
 - Empirical tuning for stable PID hover control  
 
 Thus, $\omega_{\text{base}}$ represents a **simulation-calibrated equilibrium point**, not the ideal theoretical value.
+
+## 🚀 Running the Simulation with Feedback Linearization Control
+
+### 1\. Launch Drone Simulation (Gazebo)
+
+Open a new terminal:
+
+bash
+
+Copy
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 launch drone_simulation sim.launch.py
+```
+
+This will:
+
+-   Start Gazebo
+-   Spawn the drone model
+-   Initialize simulation environment
+
+---
+
+### 2\. Commands to run the FL controller
+
+Open a new terminal:
+
+bash
+
+Copy
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 launch drone_pid_controller fl_drone.launch.py  
+```
+
+---
