@@ -333,4 +333,61 @@ source install/setup.bash
 ros2 launch drone_pid_controller fl_drone.launch.py  
 ```
 
+
 ---
+
+## 🎓 Sliding Mode Control (SMC) for Quadcopters
+
+This section of the README accompanies the three SMC Python scripts
+in `drone_pid_controller/drone_pid_controller/`. The three scripts are
+**the same idea** (force the tracking error onto a sliding surface and
+let it decay to zero), written in three different styles of increasing
+complexity. They are designed to be read in the order presented below.
+
+| # | Script | Level | Launch file |
+|---|--------|-------|-------------|
+| 1 | `smc_ind_controller.py` | Beginner | `smc_individual_controller.launch.py` |
+| 2 | `smc_mimo.py` | Intermediate | `smc_twoloops_controller.launch.py` |
+| 3 | `smc_controller.py` | Advanced | `smc_controller.launch.py` |
+
+### 1. How to Run Any of the Three SMC Controllers
+
+The procedure is identical to the PID / FBL examples above.
+
+**Step 1.** Open a terminal and start the Gazebo simulation:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 launch drone_simulation sim.launch.py
+```
+
+**Step 2.** Open a second terminal and launch the SMC variant of
+your choice:
+
+### Variant 1: independent (scalar) SMC - recommended for first contact
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 launch drone_pid_controller smc_individual_controller.launch.py
+```
+
+### Variant 2: cascaded MIMO SMC
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 launch drone_pid_controller smc_twoloops_controller.launch.py
+```
+### Variant 3: monolithic 6-DOF MIMO SMC
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 launch drone_pid_controller smc_controller.launch.py
+```
+
+Each launch file starts the corresponding controller node **and** RViz,
+so you can watch the drone follow the chosen trajectory live.
+
+---
+

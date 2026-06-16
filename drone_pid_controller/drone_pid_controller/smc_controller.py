@@ -1,3 +1,65 @@
+"""
+================================================================================
+SMC CONTROLLER FOR QUADCOPTER - VARIANT 3: MONOLITHIC 6-DOF MIMO SMC
+================================================================================
+
+TEACHING LEVEL : Advanced (Step 3 in the SMC lecture series)
+LAUNCH FILE    : smc_controller.launch.py
+ENTRY POINT    : SMC_controller_node
+
+--------------------------------------------------------------------------------
+WHAT IS THIS SCRIPT?
+--------------------------------------------------------------------------------
+This is the MOST ADVANCED of the three SMC implementations. It abandons the
+explicit outer-loop / inner-loop decomposition and builds ONE controller
+that acts on the full 6-dimensional state vector:
+
+    e = [e_x, e_y, e_z, e_phi, e_theta, e_psi]^T
+
+A single MIMO_SMC block returns a 6-dimensional virtual-acceleration
+vector nu. A control-effectiveness matrix G(X) then maps nu to the four
+physical control inputs (U1, U2, U3, U4) by means of a damped pseudo-inverse.
+
+--------------------------------------------------------------------------------
+WHY DO WE NEED A PSEUDO-INVERSE?
+--------------------------------------------------------------------------------
+The drone is UNDERACTUATED: 6 states, 4 actuators. A 6x4 matrix G(X) maps
+control inputs to state accelerations. We cannot invert a non-square
+matrix, so we use a damped Moore-Penrose pseudo-inverse
+    G_pinv = (G^T G + lambda_damp * I)^-1 G^T
+which gives the LEAST-SQUARES best-fit physical input that achieves the
+desired virtual acceleration. The lambda_damp term regularises the
+solution and prevents singularities at hover (cos(roll)=cos(pitch)=1).
+
+--------------------------------------------------------------------------------
+WHAT DOES THIS SCRIPT TEACH?
+--------------------------------------------------------------------------------
+- A 6-DOF sliding manifold that captures ALL states at once.
+- The role of f(X), the nonlinear drift term (here: gravity on z).
+- The role of G(X), the control effectiveness matrix.
+- Damped pseudo-inverse allocation from virtual accelerations to
+  physical inputs.
+- Handling of the underactuated singularity at hover.
+
+--------------------------------------------------------------------------------
+WHEN SHOULD STUDENTS STUDY THIS SCRIPT?
+--------------------------------------------------------------------------------
+Only AFTER they have understood:
+1. The scalar SMC (smc_ind_controller.py)
+2. The vector / MIMO SMC (smc_mimo.py)
+3. Why the cascade is needed and what the geometry does.
+
+--------------------------------------------------------------------------------
+STUDENT EXERCISES
+--------------------------------------------------------------------------------
+1. Toggle lambda_damp between 0.0 and 0.1 and observe the motor commands.
+2. Move from a diagonal Lambda to a full Lambda and study cross-coupling.
+3. Disable the pseudo-inverse damping and let the drone hover: the
+   allocation becomes ill-conditioned because all four motors are at
+   almost the same speed.
+================================================================================
+"""
+
 import rclpy
 from rclpy.node import Node
 import numpy as np
@@ -101,16 +163,21 @@ class QuadcopterSMC(Node):
         self.roll = self.pitch = self.yaw = 0.0
 
         # =====================================================
-        # Full 6-DOF Monolithic MIMO SMC Setup
-        # State vector: [x, y, z, roll, pitch, yaw]
+        # MONOLITHIC 6-DOF MIMO SMC
+        # ---------------------------------------------------------
+        # One controller for the FULL state vector
+        #     e = [x, y, z, roll, pitch, yaw]^T
+        # The Lambda and K matrices are diagonal for clarity.
+        # Indices [3, 4, 5] are flagged as angles so that the
+        # angular wrap-around is handled before differentiation.
         # =====================================================
         lambda_diag = [1.5, 1.5, 2.5, 6.0, 6.0, 3.0]
-        k_diag = [0.1, 0.1, 2.0, 8.0, 8.0, 4.0]
+        k_diag      = [0.1, 0.1, 2.0, 8.0, 8.0, 4.0]
 
         self.mimo_smc = MIMO_SMC(
-            num_dims=6, 
-            lambda_matrix=np.diag(lambda_diag), 
-            k_matrix=np.diag(k_diag), 
+            num_dims=6,
+            lambda_matrix=np.diag(lambda_diag),
+            k_matrix=np.diag(k_diag),
             delta=1.5,
             angle_indices=[3, 4, 5]  # Roll, Pitch, Yaw are angles
         )
@@ -165,13 +232,13 @@ class QuadcopterSMC(Node):
     def control_step(self, t, dt):
         # 1. Fetch Trajectory Target
         params = self.get_trajectory_params()
-        
+
         # Prevent floating-point precision loss
         if "w" in params and params["w"] > 0:
             bounded_t = t % ((2 * np.pi) / params["w"])
         else:
             bounded_t = t
-            
+
         tx, ty, tz = get_target(self.traj_type, params, bounded_t)
 
         err_x = tx - self.current_x
@@ -179,14 +246,18 @@ class QuadcopterSMC(Node):
         err_z = tz - self.current_z
 
         # 2. Heuristic Target Tilt (Prevents Hover Singularity in 6-DOF matrix)
+        # The monolithic controller would otherwise need an inverse dynamics
+        # step to obtain a desired attitude from the position error. To
+        # keep the script simple, we propose a desired roll/pitch that
+        # points the drone's thrust vector towards the position target.
         k_tilt = 0.25
-        desired_roll = clamp(k_tilt * (err_x * np.sin(self.yaw) - err_y * np.cos(self.yaw)), -0.35, 0.35)
+        desired_roll  = clamp(k_tilt * (err_x * np.sin(self.yaw) - err_y * np.cos(self.yaw)), -0.35, 0.35)
         desired_pitch = clamp(k_tilt * (err_x * np.cos(self.yaw) + err_y * np.sin(self.yaw)), -0.35, 0.35)
-        desired_yaw = 0.0
+        desired_yaw   = 0.0
 
-        err_roll = (desired_roll - self.roll + np.pi) % (2 * np.pi) - np.pi
+        err_roll  = (desired_roll  - self.roll  + np.pi) % (2 * np.pi) - np.pi
         err_pitch = (desired_pitch - self.pitch + np.pi) % (2 * np.pi) - np.pi
-        err_yaw = (desired_yaw - self.yaw + np.pi) % (2 * np.pi) - np.pi
+        err_yaw   = (desired_yaw   - self.yaw   + np.pi) % (2 * np.pi) - np.pi
 
         # 3. Construct the 6-Dimensional Error Vector
         error_vec = np.array([err_x, err_y, err_z, err_roll, err_pitch, err_yaw])
@@ -195,29 +266,40 @@ class QuadcopterSMC(Node):
         v_vector = self.mimo_smc.compute(error_vec, dt)
 
         # 5. Define the Nonlinear Drift Dynamics f(X) (Cleaned from gyro noise)
+        # The drift term contains all the dynamics that the SMC does NOT
+        # need to overcome with its switching gain. For a quadcopter in
+        # hover, the dominant drift is gravity on the z-axis.
         f_x = np.zeros((6, 1))
         f_x[2, 0] = -self.gravity
 
         # 6. Define the Control Matrix G(X) mapping the 4 inputs to 6 states
+        # Rows correspond to [x, y, z, roll, pitch, yaw].
+        # Columns correspond to [U1 (thrust), U2 (roll torque), U3 (pitch torque), U4 (yaw torque)].
         phi, theta, psi = self.roll, self.pitch, self.yaw
         G_x = np.zeros((6, 4))
-        
+
         # True physical mapping
         gx_true = (np.cos(phi) * np.sin(theta) * np.cos(psi) + np.sin(phi) * np.sin(psi)) / self.mass
         gy_true = (np.cos(phi) * np.sin(theta) * np.sin(psi) - np.sin(phi) * np.cos(psi)) / self.mass
-        
+
         # Tiny epsilon tolerance to prevent hover singularity
         epsilon = 1e-4
         G_x[0, 0] = gx_true if abs(gx_true) > epsilon else np.sign(gx_true + 1e-9) * epsilon
         G_x[1, 0] = gy_true if abs(gy_true) > epsilon else np.sign(gy_true + 1e-9) * epsilon
-        
+
         G_x[2, 0] = (np.cos(phi) * np.cos(theta)) / self.mass
         G_x[3, 1] = 1.0 / self.Ixx
         G_x[4, 2] = 1.0 / self.Iyy
         G_x[5, 3] = 1.0 / self.Izz
 
         # 7. Damped Pseudo-Inverse Control Allocation (Tikhonov Regularization)
-        lambda_damp = 0.01  
+        # G is 6x4 (more rows than columns). The damped pseudo-inverse
+        #     G_pinv = (G^T G + lambda_damp * I)^-1 G^T
+        # gives the LEAST-SQUARES best fit of the four physical inputs
+        # to the six desired virtual accelerations. The damping term
+        # lambda_damp * I prevents the inverse from blowing up when G
+        # is ill-conditioned (e.g. at perfect hover).
+        lambda_damp = 0.01
         G_pinv = np.linalg.inv(G_x.T @ G_x + lambda_damp * np.eye(4)) @ G_x.T
         U_physical = G_pinv @ (v_vector - f_x)
 
@@ -230,10 +312,10 @@ class QuadcopterSMC(Node):
         U1 = clamp(U1, self.mass * self.gravity * 0.5, self.mass * self.gravity * 2.0)
 
         # 8. Physical Motor Mixing
-        t_base = U1 / (4 * self.kf)
-        t_roll = U2 / (4 * self.kf * self.L_y)  
-        t_pitch = U3 / (4 * self.kf * self.L_x) 
-        t_yaw = U4 / (4 * self.km)
+        t_base  = U1 / (4 * self.kf)
+        t_roll  = U2 / (4 * self.kf * self.L_y)
+        t_pitch = U3 / (4 * self.kf * self.L_x)
+        t_yaw   = U4 / (4 * self.km)
 
         w0_sq = t_base - t_roll - t_pitch - t_yaw
         w1_sq = t_base + t_roll + t_pitch - t_yaw

@@ -1,3 +1,67 @@
+"""
+================================================================================
+SMC CONTROLLER FOR QUADCOPTER - VARIANT 2: CASCADED MIMO SMC
+================================================================================
+
+TEACHING LEVEL : Intermediate (Step 2 in the SMC lecture series)
+LAUNCH FILE    : smc_twoloops_controller.launch.py
+ENTRY POINT    : Cascade_SMC_twoloop_controller_node
+                 (this file is the source for the two-loops executable;
+                  the launch file in this repo maps to smc_two_loop_controller.py,
+                  which is byte-identical to this script)
+
+--------------------------------------------------------------------------------
+WHAT IS THIS SCRIPT?
+--------------------------------------------------------------------------------
+This is the SECOND of three SMC implementations. It upgrades the scalar SMC
+to a vector (MIMO) formulation and uses TWO controllers instead of six:
+
+    Outer MIMO SMC (3-D) -> position  (x, y, z)
+    Inner MIMO SMC (3-D) -> attitude  (roll, pitch, yaw)
+
+--------------------------------------------------------------------------------
+WHY "MIMO"?
+--------------------------------------------------------------------------------
+MIMO = Multi-Input Multi-Output. In smc_ind_controller.py we used six
+independent scalar SMCs (SISO). Here we replace them with two VECTOR SMCs
+that share a single sliding manifold:
+
+    S(t) = e_dot(t) + Lambda * e(t)              (vector sliding surface)
+    nu   = Lambda * e_dot + K * S / (||S|| + delta)
+
+The switching term is now a UNIT VECTOR along S, scaled by a matrix K.
+||S|| is the Euclidean norm of the sliding vector, and delta is the
+boundary-layer thickness (analogous to phi in the scalar case).
+
+--------------------------------------------------------------------------------
+KEY ADVANTAGES OVER smc_ind_controller.py
+--------------------------------------------------------------------------------
+- One sliding surface per loop captures the COUPLING between axes
+  (e.g. wind disturbing x will immediately be visible in the S vector).
+- Gain matrices Lambda and K are diagonal, so per-axis tuning is still
+  intuitive, but the structure is ready for full cross-coupling matrices.
+- Chattering is reduced simultaneously on all axes via a single
+  vector-norm boundary layer.
+
+--------------------------------------------------------------------------------
+CASCADE REMAINS THE SAME
+--------------------------------------------------------------------------------
+The position SMC still outputs virtual translational accelerations
+(v_x, v_y, v_z) that are converted into a desired roll, desired pitch
+and total thrust. The attitude SMC then tracks those desired angles
+exactly as in the scalar script.
+
+--------------------------------------------------------------------------------
+STUDENT EXERCISES
+--------------------------------------------------------------------------------
+1. Compare tracking performance against smc_ind_controller.py on the
+   same trajectory.
+2. Reduce delta to 0.1 and observe chattering on all axes at once.
+3. Break the diagonal assumption: put off-diagonal terms in Lambda or
+   K and see how the axes start interacting.
+================================================================================
+"""
+
 import rclpy
 from rclpy.node import Node
 import numpy as np
@@ -24,8 +88,36 @@ def clamp(val, min_val, max_val):
 
 class MIMO_SMC:
     """
-    True Multiple-Input Multiple-Output (MIMO) Sliding Mode Controller.
-    Computes a full virtual control vector using multi-dimensional manifolds.
+    A vector (multi-dimensional) Sliding Mode Controller.
+
+    Where the scalar SMC class works on one error at a time, this class
+    works on a VECTOR of tracking errors simultaneously. Internally it
+    builds a single multi-dimensional sliding surface:
+
+        S(t) = e_dot(t) + Lambda * e(t)
+
+    and produces a vector of virtual control inputs:
+
+        nu = Lambda * e_dot + K * S / (||S|| + delta)
+
+    Parameters
+    ----------
+    num_dims       : int
+        Dimension of the error vector (e.g. 3 for x/y/z, 6 for full 6-DOF).
+    lambda_matrix  : (num_dims x num_dims) array
+        Slope matrix of the sliding surface. Diagonal entries act as
+        the per-axis lambda used in the scalar SMC. Off-diagonal entries
+        introduce coupling between axes.
+    k_matrix       : (num_dims x num_dims) array
+        Robust switching gain matrix. Must be large enough to reject
+        the worst-case disturbance on each axis.
+    delta          : float
+        Boundary-layer thickness for the vector norm. Analogous to phi
+        in the scalar SMC.
+    angle_indices  : list of int or None
+        Indices of the error-vector entries that correspond to ANGLES.
+        They are wrapped into [-pi, pi] before differentiation to avoid
+        spurious jumps when, e.g., yaw crosses the +/-pi boundary.
     """
     def __init__(self, num_dims, lambda_matrix, k_matrix, delta=0.5, angle_indices=None):
         self.num_dims = num_dims
@@ -37,29 +129,46 @@ class MIMO_SMC:
         self.angle_indices = angle_indices if angle_indices is not None else []
 
     def compute(self, error_vector, dt):
+        """
+        Compute one step of the vector SMC law.
+
+        Parameters
+        ----------
+        error_vector : array-like of length num_dims
+            Current tracking errors  e = x_desired - x_current.
+        dt           : float
+            Time elapsed since the previous call (seconds).
+
+        Returns
+        -------
+        nu : (num_dims x 1) numpy array
+            Vector of virtual control inputs (one per controlled axis).
+        """
         if dt <= 0.0:
             return np.zeros((self.num_dims, 1))
-            
+
         error = np.array(error_vector).reshape(self.num_dims, 1)
-        
-        # 1. Error derivative vector (safely handling angular wraparound)
+
+        # 1. Error derivative vector (safely handling angular wraparound).
         error_diff = error - self.last_error
-        
+
         for idx in self.angle_indices:
             # Force the angular difference to be between -pi and pi
             error_diff[idx] = (error_diff[idx] + np.pi) % (2 * np.pi) - np.pi
-            
+
         error_dot = error_diff / dt
         self.last_error = error
 
-        # 2. Multi-dimensional Sliding Manifold: S = e_dot + Lambda * e
+        # 2. Multi-dimensional Sliding Manifold:  S = e_dot + Lambda * e
         S = error_dot + self.Lambda @ error
 
-        # 3. Vector norm boundary layer (Prevents chattering across all axes simultaneously)
+        # 3. Vector norm boundary layer. Dividing the sliding vector by
+        #    its own norm + delta yields a UNIT VECTOR switching term.
+        #    This is the vector equivalent of tanh(s/phi) in the scalar case.
         s_norm = np.linalg.norm(S)
         switching_term = S / (s_norm + self.delta)
 
-        # 4. Virtual Control Vector
+        # 4. Virtual control vector.
         nu = (self.Lambda @ error_dot) + (self.K @ switching_term)
         return nu
 
@@ -102,16 +211,22 @@ class QuadcopterSMC(Node):
         self.last_roll = self.last_pitch = self.last_yaw = 0.0
 
         # =====================================================
-        # Cascaded MIMO Sliding Mode Controllers
+        # CASCADED MIMO SMC TUNING
+        # ---------------------------------------------------------
+        # Two MIMO controllers, each acting on a 3-dimensional vector.
+        # The position controller drives (x, y, z). The attitude
+        # controller drives (roll, pitch, yaw).
+        # Diagonal Lambda/K are used for clarity, but the matrices
+        # are real numpy arrays, so off-diagonal coupling is allowed.
         # =====================================================
         # 1. Outer Loop MIMO (Position X, Y, Z)
         lambda_pos = np.diag([1.5, 1.5, 2.5])
-        k_pos = np.diag([0.5, 0.5, 2.0])  
-        
+        k_pos = np.diag([0.5, 0.5, 2.0])
+
         self.smc_pos = MIMO_SMC(
-            num_dims=3, 
-            lambda_matrix=lambda_pos, 
-            k_matrix=k_pos, 
+            num_dims=3,
+            lambda_matrix=lambda_pos,
+            k_matrix=k_pos,
             delta=1.0,
             angle_indices=[]  # Explicitly tell the SMC that X, Y, Z are NOT angles!
         )
@@ -119,13 +234,13 @@ class QuadcopterSMC(Node):
         # 2. Inner Loop MIMO (Attitude Roll, Pitch, Yaw)
         lambda_att = np.diag([8.0, 8.0, 4.0])
         k_att = np.diag([10.0, 10.0, 5.0])
-        
+
         self.smc_att = MIMO_SMC(
-            num_dims=3, 
-            lambda_matrix=lambda_att, 
-            k_matrix=k_att, 
+            num_dims=3,
+            lambda_matrix=lambda_att,
+            k_matrix=k_att,
             delta=1.5,
-            angle_indices=[0, 1, 2] # Protect all 3 attitude angles from wrap-around
+            angle_indices=[0, 1, 2]  # Protect all 3 attitude angles from wrap-around
         )
 
         self.last_time = self.get_clock().now()
@@ -199,10 +314,15 @@ class QuadcopterSMC(Node):
 
         # =========================================================
         # OUTER LOOP: Position MIMO SMC
+        # ---------------------------------------------------------
+        # The whole position error vector is processed at once,
+        # producing a vector of virtual accelerations v_pos.
+        # We then split v_pos into v_x, v_y, v_z for clarity, but
+        # the SMC has already taken cross-axis coupling into account.
         # =========================================================
         err_pos = np.array([err_x, err_y, err_z])
         v_pos = self.smc_pos.compute(err_pos, dt)
-        
+
         # Extract desired virtual accelerations (limited to prevent extreme maneuvers)
         v_x = clamp(float(v_pos[0, 0]), -3.0, 3.0)
         v_y = clamp(float(v_pos[1, 0]), -3.0, 3.0)
@@ -217,14 +337,19 @@ class QuadcopterSMC(Node):
         # Simplified Linear Mapping (Small Angle Approximation)
         desired_roll = clamp((v_x * np.sin(self.yaw) - v_y * np.cos(self.yaw)) / self.gravity, -0.35, 0.35)
         desired_pitch = clamp((v_x * np.cos(self.yaw) + v_y * np.sin(self.yaw)) / self.gravity, -0.35, 0.35)
-        desired_yaw = 0.0  
+        desired_yaw = 0.0
 
         # =========================================================
         # INNER LOOP: Attitude MIMO SMC
+        # ---------------------------------------------------------
+        # The attitude error vector is processed at once.
+        # The switching matrix K is large enough to absorb the
+        # gyroscopic cross-coupling terms without an explicit
+        # feedback-linearization step.
         # =========================================================
-        err_roll = (desired_roll - self.roll + np.pi) % (2 * np.pi) - np.pi
+        err_roll  = (desired_roll  - self.roll  + np.pi) % (2 * np.pi) - np.pi
         err_pitch = (desired_pitch - self.pitch + np.pi) % (2 * np.pi) - np.pi
-        err_yaw = (desired_yaw - self.yaw + np.pi) % (2 * np.pi) - np.pi
+        err_yaw   = (desired_yaw   - self.yaw   + np.pi) % (2 * np.pi) - np.pi
 
         err_att = np.array([err_roll, err_pitch, err_yaw])
         v_att = self.smc_att.compute(err_att, dt)
@@ -234,13 +359,16 @@ class QuadcopterSMC(Node):
         U3 = self.Iyy * float(v_att[1, 0])
         U4 = self.Izz * float(v_att[2, 0])
 
-        # =========================================================
+        # =====================================================
         # MOTOR MIXING
-        # =========================================================
-        t_base = U1 / (4 * self.kf)
-        t_roll = U2 / (4 * self.kf * self.L_y)  
-        t_pitch = U3 / (4 * self.kf * self.L_x) 
-        t_yaw = U4 / (4 * self.km)
+        # ---------------------------------------------------------
+        # Same X-configuration mixer used in the scalar script.
+        # Each motor command is clamped to [200, 1200] RPM.
+        # =====================================================
+        t_base  = U1 / (4 * self.kf)
+        t_roll  = U2 / (4 * self.kf * self.L_y)
+        t_pitch = U3 / (4 * self.kf * self.L_x)
+        t_yaw   = U4 / (4 * self.km)
 
         w0_sq = t_base - t_roll - t_pitch - t_yaw
         w1_sq = t_base + t_roll + t_pitch - t_yaw
