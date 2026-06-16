@@ -373,6 +373,20 @@ source install/setup.bash
 ros2 launch drone_pid_controller smc_individual_controller.launch.py
 ```
 
+> **Live Dashboard.** When this script runs, a **6-plot matplotlib
+> window** pops up automatically (separate thread, no slowdown of the
+> controller):
+>
+> 1. **Phase portrait** (z-axis) with the sliding line `ė = -λe`
+> 2. **Top-down 2-D trajectory** (x-y) — desired vs. actual path
+> 3. **Altitude tracking** `z(t)` — desired vs. actual
+> 4. **Sliding variable** `s(t)` for all 6 axes
+> 5. **Tracking error** `e(t)` for x, y, z
+> 6. **Control input** `v(t)` for all 6 axes (chattering view)
+>
+> The dashboard requires `matplotlib`. If it is not installed, the
+> controller still works normally — only the window is skipped.
+
 ### Variant 2: cascaded MIMO SMC
 ```bash
 source /opt/ros/jazzy/setup.bash
