@@ -1,0 +1,61 @@
+quadcopter_smc:
+  ros__parameters:
+    trajectory:
+      shape: "circle"
+      A: 2.0
+      radius: 2.0
+      height: 3.0
+      climb_rate: 0.1
+      side: 4.0
+      segment_time: 4.0
+      num_points: 30
+
+    gains:
+      lambda_x: 0.6
+      lambda_y: 0.6
+      lambda_z: 1.0
+      k_x: 4.0
+      k_y: 4.0
+      k_z: 45.0
+      lambda_roll: 1.5
+      lambda_pitch: 1.5
+      lambda_yaw: 1.0
+      k_roll: 8.0
+      k_pitch: 8.0
+      k_yaw: 0.0
+
+    eps:
+      x: 0.30
+      y: 0.30
+      z: 0.30
+      roll: 0.30
+      pitch: 0.30
+      yaw: 0.30
+
+    limits:
+      max_roll_deg: 7.0
+      max_pitch_deg: 7.0
+      max_body_rate_dps: 120.0
+      max_u_roll: 20.0
+      max_u_pitch: 20.0
+      max_u_z: 120.0
+      max_u_yaw: 30.0
+
+    motors:
+      base_speed: 656.0
+      min: 400.0
+      max: 800.0
+
+    yaw_ref_deg: 0.0
+
+    runtime:
+      control_dt: 0.02
+      vel_filter_alpha: 0.20
+      max_path_len: 5000
+      csv_path: "tracking_error.csv"
+      fail_safe_error: 8.0
+
+    dashboard:
+      enabled: false
+      update_period: 0.1
+      history_len: 1000
