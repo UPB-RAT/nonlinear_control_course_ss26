@@ -15,6 +15,7 @@ setup(
         ('share/' + package_name + '/launch', ['launch/smc_twoloops_controller.launch.py']),
         ('share/' + package_name + '/launch', ['launch/smc_controller.launch.py']),
         ('share/' + package_name + '/launch', ['launch/drone_twist.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/drone.launch.py']),
         ('share/' + package_name + '/launch', ['launch/drone_twist_snap.launch.py']),
         ('share/' + package_name + '/config', ['config/drone_view.rviz']),
     ],

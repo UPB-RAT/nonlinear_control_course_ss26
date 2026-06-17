@@ -95,44 +95,44 @@ class QuadcopterPID(Node):
 
         # Position controllers
         self.pid_x = PID(
-            kp=80.0,
-            ki=1.0,
-            kd=50.0,
-            output_limit=5.0,
-            integral_limit=50.0
+            kp=10.0,
+            ki=0.8,
+            kd=5.0,
+            output_limit=12.0,
+            integral_limit=10.0
         )
 
         self.pid_y = PID(
-            kp=80.0,
-            ki=1.0,
-            kd=50.0,
-            output_limit=5.0,
-            integral_limit=50.0
+            kp=10.0,
+            ki=0.8,
+            kd=5.0,
+            output_limit=12.0,
+            integral_limit=10.0
         )
 
         self.pid_z = PID(
-            kp=80.0,
-            ki=1.0,
+            kp=50.0,
+            ki=2.0,
             kd=50.0,
-            output_limit=200.0,
-            integral_limit=15.0
+            output_limit=100.0,
+            integral_limit=10.0
         )
 
         # Attitude controllers
         self.pid_roll = PID(
-            kp=0.1,
+            kp=2.0,
             ki=0.0,
             kd=1.0,
-            output_limit=100.0,
-            integral_limit=10.0
+            output_limit=12.0,
+            integral_limit=0.0
         )
 
         self.pid_pitch = PID(
-            kp=0.1,
+            kp=2.0,
             ki=0.0,
             kd=1.0,
-            output_limit=100.0,
-            integral_limit=10.0
+            output_limit=12.0,
+            integral_limit=0.0
         )
 
         # =====================================================
@@ -265,14 +265,14 @@ class QuadcopterPID(Node):
 
         desired_roll = clamp(
             desired_roll,
-            -5.0,
-            5.0
+            -6.0,
+            6.0
         )
 
         desired_pitch = clamp(
             desired_pitch,
-            -5.0,
-            5.0
+            -6.0,
+            6.0
         )
 
         # =====================================================

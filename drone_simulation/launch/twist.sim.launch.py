@@ -13,15 +13,30 @@ def generate_launch_description():
     pkg_share = get_package_share_directory(pkg_name)
 
     models_dir = os.path.join(pkg_share, 'models')
+    world_dir = os.path.join(pkg_share, 'worlds')
 
     # ---------------------------------------------------
-    # Detect simulator
+    # Detect ROS distro + simulator
     # ---------------------------------------------------
-    use_gz = shutil.which('gz') is not None
-    use_ign = shutil.which('ign') is not None
+    ros_distro = os.environ.get('ROS_DISTRO', '').lower()
 
-    if use_gz:
-        gazebo_cmd = ['gz', 'sim', '-v', '4', os.path.join(pkg_share, 'worlds', 'drone_world_twist.sdf')]
+    has_gz = shutil.which('gz') is not None
+    has_ign = shutil.which('ign') is not None
+
+    gazebo_cmd = None
+    resource_env = None
+    msg_prefix = None
+
+    # Iron / Jazzy / Rolling → Gazebo (gz)
+    if ros_distro in ['iron', 'jazzy', 'rolling'] and has_gz:
+
+        gazebo_cmd = [
+            'gz',
+            'sim',
+            '-v',
+            '4',
+            os.path.join(world_dir, 'drone_world_twist.sdf')
+        ]
 
         resource_env = SetEnvironmentVariable(
             name='GZ_SIM_RESOURCE_PATH',
@@ -30,8 +45,51 @@ def generate_launch_description():
 
         msg_prefix = 'gz.msgs'
 
-    elif use_ign:        
-        gazebo_cmd = ['ign', 'gazebo', '-v', '4', os.path.join(pkg_share, 'worlds', 'drone_world_ign_twist.sdf')]
+    # Humble → Ignition
+    elif ros_distro in ['humble'] and has_ign:
+
+        gazebo_cmd = [
+            'ign',
+            'gazebo',
+            '-v',
+            '4',
+            os.path.join(world_dir, 'drone_world_ign_twist.sdf')
+        ]
+
+        resource_env = SetEnvironmentVariable(
+            name='IGN_GAZEBO_RESOURCE_PATH',
+            value=models_dir
+        )
+
+        msg_prefix = 'ignition.msgs'
+
+    # Fallback if ROS_DISTRO unavailable
+    elif has_gz:
+
+        gazebo_cmd = [
+            'gz',
+            'sim',
+            '-v',
+            '4',
+            os.path.join(world_dir, 'drone_world_twist.sdf')
+        ]
+
+        resource_env = SetEnvironmentVariable(
+            name='GZ_SIM_RESOURCE_PATH',
+            value=models_dir
+        )
+
+        msg_prefix = 'gz.msgs'
+
+    elif has_ign:
+
+        gazebo_cmd = [
+            'ign',
+            'gazebo',
+            '-v',
+            '4',
+            os.path.join(world_dir, 'drone_world_ign_twist.sdf')
+        ]
 
         resource_env = SetEnvironmentVariable(
             name='IGN_GAZEBO_RESOURCE_PATH',
@@ -41,7 +99,9 @@ def generate_launch_description():
         msg_prefix = 'ignition.msgs'
 
     else:
-        raise RuntimeError("Neither 'gz' nor 'ign' Gazebo found")
+        raise RuntimeError(
+            f"No compatible Gazebo found for ROS_DISTRO='{ros_distro}'"
+        )
 
     gazebo = ExecuteProcess(
         cmd=gazebo_cmd,
