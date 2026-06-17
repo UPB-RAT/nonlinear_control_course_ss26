@@ -11,6 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', ['launch/fbl.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/fl_drone.launch.py']),
         ('share/' + package_name + '/launch', ['launch/smc_individual_controller.launch.py']),
         ('share/' + package_name + '/launch', ['launch/smc_twoloops_controller.launch.py']),
         ('share/' + package_name + '/launch', ['launch/smc_controller.launch.py']),
@@ -39,6 +40,7 @@ setup(
             'Cascade_SMC_ind_controller_node = drone_pid_controller.smc_ind_controller:main',
             'Cascade_SMC_twoloop_controller_node = drone_pid_controller.smc_two_loop_controller:main',
             'SMC_controller_node = drone_pid_controller.smc_controller:main',
+            'fl_controller_node = drone_pid_controller.drone_fl_controller:main',
         ],
     },
 )
